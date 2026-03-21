@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+    <style>
+        body { margin: 0; background: #000; overflow: hidden; color: white; font-family: 'Courier New', Courier, monospace; }
+        #canvas_output { width: 100vw; height: 100vh; object-fit: cover; transform: scaleX(-1); }
+        #status { position: absolute; top: 10%; width: 100%; text-align: center; font-size: 20px; font-weight: bold; z-index: 100; text-transform: uppercase; letter-spacing: 2px; }
+        .flash { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: white; opacity: 0; pointer-events: none; z-index: 50; }
+    </style>
+</head>
+<body>
+    <div id="flash-screen" class="flash"></div>
+    <div id="status">INITIALIZING CHAKRA...</div>
+    <video id="video_input" style="display:none;" playsinline></video>
+    <canvas id="output_canvas"></canvas>
+
+    <script>
+        const videoElement = document.getElementById('video_input');
+        const canvasElement = document.getElementById('output_canvas');
+        const canvasCtx = canvasElement.getContext('2d');
+        const statusDiv = document.getElementById('status');
+        const flashScreen = document.getElementById('flash-screen');
+
+        let cloneData = null;
+        let isJutsuActive = false;
+
+        // Audio setup (Synth 'Poof' sound since we can't link local files easily)
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playPoofSound() {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'noise'; // Creating a white noise burst for the 'Poof'
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+            osc.stop(audioCtx.currentTime + 0.5);
+        }
+
+        function triggerJutsu(image) {
+            if (!isJutsuActive) {
+                isJutsuActive = true;
+                playPoofSound();
+                
+                // Visual Flash Effect
+                flashScreen.style.opacity = '1';
+                setTimeout(() => { flashScreen.style.opacity = '0'; }, 150);
+                
+                statusDiv.innerText = "KAGE BUNSHIN NO JUTSU!";
+                statusDiv.style.color = "#FFD700";
+                cloneData = image;
+            }
+        }
+
+        function onResults(results) {
+            canvasCtx.save();
+            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+            canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+
+            if (results.multiHandLandmarks && results.multiHandLandmarks.length === 2) {
+                const h1 = results.multiHandLandmarks[0][8]; // Index Tip Hand 1
+                const h2 = results.multiHandLandmarks[1][8]; // Index Tip Hand 2
+                
+                const dist = Math.hypot(h1.x - h2.x, h1.y - h2.y);
+
+                if (dist < 0.07) {
+                    triggerJutsu(results.image);
+                }
+            } else {
+                isJutsuActive = false;
+                cloneData = null;
+                statusDiv.innerText = "FORM THE CROSS SEAL";
+                statusDiv.style.color = "white";
+            }
+
+            if (cloneData && isJutsuActive) {
+                canvasCtx.globalAlpha = 0.7;
+                // Draw two clones slightly offset
+                canvasCtx.drawImage(cloneData, -canvasElement.width/4, 80, canvasElement.width/1.5, canvasElement.height/1.5);
+                canvasCtx.drawImage(cloneData, canvasElement.width/1.8, 80, canvasElement.width/1.5, canvasElement.height/1.5);
+                canvasCtx.globalAlpha = 1.0;
+            }
+            canvasCtx.restore();
+        }
+
+        const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
+        hands.setOptions({ maxNumHands: 2, modelComplexity: 1, minDetectionConfidence: 0.6 });
+        hands.onResults(onResults);
+
+        const camera = new Camera(videoElement, {
+            onFrame: async () => {
+                canvasElement.width = videoElement.videoWidth;
+                canvasElement.height = videoElement.videoHeight;
+                await hands.send({image: videoElement});
+            },
+            facingMode: 'user'
+        });
+        camera.start().then(() => statusDiv.innerText = "READY");
+    </script>
+</body>
+</html>
