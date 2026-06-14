@@ -1,104 +1,388 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
-    <style>
-        body { margin: 0; background: #000; overflow: hidden; color: white; font-family: 'Courier New', Courier, monospace; }
-        #canvas_output { width: 100vw; height: 100vh; object-fit: cover; transform: scaleX(-1); }
-        #status { position: absolute; top: 10%; width: 100%; text-align: center; font-size: 20px; font-weight: bold; z-index: 100; text-transform: uppercase; letter-spacing: 2px; }
-        .flash { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: white; opacity: 0; pointer-events: none; z-index: 50; }
-    </style>
+    <title>Naruto Jutsu Dojo - Shinobi Training</title>
+    <!-- MediaPipe CDNs -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_detection/face_detection.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <!-- Custom Style Sheet -->
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div id="flash-screen" class="flash"></div>
-    <div id="status">INITIALIZING CHAKRA...</div>
-    <video id="video_input" style="display:none;" playsinline></video>
-    <canvas id="output_canvas"></canvas>
-
-    <script>
-        const videoElement = document.getElementById('video_input');
-        const canvasElement = document.getElementById('output_canvas');
-        const canvasCtx = canvasElement.getContext('2d');
-        const statusDiv = document.getElementById('status');
-        const flashScreen = document.getElementById('flash-screen');
-
-        let cloneData = null;
-        let isJutsuActive = false;
-
-        // Audio setup (Synth 'Poof' sound since we can't link local files easily)
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        function playPoofSound() {
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            osc.type = 'noise'; // Creating a white noise burst for the 'Poof'
-            osc.connect(gain);
-            gain.connect(audioCtx.destination);
-            osc.start();
-            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
-            osc.stop(audioCtx.currentTime + 0.5);
-        }
-
-        function triggerJutsu(image) {
-            if (!isJutsuActive) {
-                isJutsuActive = true;
-                playPoofSound();
+    <!-- Scrollable Loading / Intro Screen -->
+    <div id="intro-screen">
+        <div class="intro-content-wrapper">
+            <div class="intro-logo-container">
+                <svg class="konoha-swirl" viewBox="0 0 100 100">
+                    <path d="M 50 15 C 30 15 15 30 15 50 C 15 70 30 85 50 85 C 70 85 85 70 85 50 C 85 30 70 15 50 15 M 50 25 C 65 25 75 35 75 50 C 75 60 68 70 55 74 C 48 76 40 73 38 66 C 36 60 41 53 48 53 C 53 53 58 50 58 45 C 58 40 50 38 42 42 C 34 46 32 55 35 62" />
+                </svg>
+            </div>
+            
+            <div class="intro-header">
+                <h1 class="intro-title">SHINOBI DOJO</h1>
+                <p class="intro-subtitle">Interactive AI Hand Recognition</p>
+            </div>
+            
+            <!-- Scroll indicator -->
+            <div class="scroll-indicator">
+                <span>SCROLL DOWN FOR REGISTRATION</span>
+                <svg viewBox="0 0 24 24"><path d="M7 10l5 5 5-5"/></svg>
+            </div>
+            
+            <!-- Section 1: Lore / Affinity Guide -->
+            <section class="intro-section">
+                <h2>Choose Your Nature Element</h2>
+                <p>A shinobi's chakra nature defines their affinity for Jutsus. In this Dojo, your nature is locked upon registration. You can only perform the secret art of your chosen element.</p>
                 
-                // Visual Flash Effect
-                flashScreen.style.opacity = '1';
-                setTimeout(() => { flashScreen.style.opacity = '0'; }, 150);
+                <div class="lore-grid">
+                    <div class="lore-card wind">
+                        <div class="lore-card-header">
+                            <span class="lore-card-title">WIND AFFINITY</span>
+                            <span style="font-family:'Shojumaru'; color:var(--chakra-wind)">風</span>
+                        </div>
+                        <p class="lore-card-desc">Unlocks the <strong>Rasengan</strong>. Condense wind chakra by forming a <strong>🤙 Shaka Sign</strong> (extend your Thumb & Pinky, curl other fingers).</p>
+                    </div>
+                    
+                    <div class="lore-card lightning">
+                        <div class="lore-card-header">
+                            <span class="lore-card-title">LIGHTNING AFFINITY</span>
+                            <span style="font-family:'Shojumaru'; color:var(--chakra-lightning)">雷</span>
+                        </div>
+                        <p class="lore-card-desc">Unlocks the <strong>Chidori</strong>. Gather electricity by forming a <strong>🤘 Rock-on Sign</strong> (extend your Index & Pinky, curl middle/ring fingers).</p>
+                    </div>
+                    
+                    <div class="lore-card fire">
+                        <div class="lore-card-header">
+                            <span class="lore-card-title">FIRE AFFINITY</span>
+                            <span style="font-family:'Shojumaru'; color:var(--chakra-fire)">火</span>
+                        </div>
+                        <p class="lore-card-desc">Unlocks the <strong>Fireball Jutsu</strong>. Expel flames by holding a <strong>🖐️ Open Flat Palm</strong> facing the camera.</p>
+                    </div>
+                    
+                    <div class="lore-card shadow">
+                        <div class="lore-card-header">
+                            <span class="lore-card-title">SHADOW AFFINITY</span>
+                            <span style="font-family:'Shojumaru'; color:var(--chakra-shadow)">影</span>
+                        </div>
+                        <p class="lore-card-desc">Unlocks the <strong>Shadow Clone Jutsu</strong>. Form clones using the Confrontation seal: make a <strong>✌️ Peace Sign</strong> (extend Index & Middle fingers).</p>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- Section 2: Instructions and Training Rules -->
+            <section class="intro-section">
+                <h2>Rules of the Dojo</h2>
+                <p>Follow these instructions to complete your training and rank up:</p>
+                <ul style="color:var(--text-secondary); text-align:left; font-size:0.95rem; line-height:1.6; display:flex; flex-direction:column; gap:12px; max-width:600px; margin:0 auto; padding-left:20px;">
+                    <li><strong>Locked Affinity:</strong> Once you register, you cannot change your nature type during the training session. Make your choice wisely.</li>
+                    <li><strong>Jutsu Sustainment:</strong> Form and hold the required hand sign for a moment. Once invoked, the Jutsu is locked active! You can release the sign, move your hands, and run around while the Jutsu remains active, just like in the anime.</li>
+                    <li><strong>Chakra Exhaustion:</strong> Casting Jutsus consumes your chakra. If your chakra drops to 0%, you enter a state of exhaustion.</li>
+                    <li><strong>Gather Sparks Mini-game:</strong> To recover your chakra, you must touch the glowing chakra spark targets that appear on the screen using your hand. Collecting all sparks restores your chakra.</li>
+                    <li><strong>Ninja Ranks & Infinite Use:</strong> Earn XP by casting Jutsus and gathering chakra. Rank up from Academy Student, Genin, Chunin, to Jonin. Reaching the legendary rank of <strong>Kage</strong> grants you infinite chakra with 0% cost!</li>
+                </ul>
+            </section>
+            
+            <!-- Section 3: Registration / Login Form -->
+            <section class="intro-section">
+                <h2>Shinobi Entrance</h2>
+                <div class="registration-tabs" style="display:flex; justify-content:center; gap:20px; margin-bottom:25px; border-bottom:1px solid var(--border-color); padding-bottom:12px;">
+                    <button id="tab-new-shinobi" class="tab-btn active" style="background:none; border:none; color:var(--active-chakra); font-family:'Share Tech Mono', monospace; font-size:1rem; font-weight:bold; cursor:pointer; padding:5px 15px; border-bottom:2px solid var(--active-chakra); transition:all 0.3s;">NEW SHINOBI</button>
+                    <button id="tab-load-scroll" class="tab-btn" style="background:none; border:none; color:var(--text-secondary); font-family:'Share Tech Mono', monospace; font-size:1rem; font-weight:bold; cursor:pointer; padding:5px 15px; border-bottom:2px solid transparent; transition:all 0.3s;">LOAD SCROLL</button>
+                </div>
                 
-                statusDiv.innerText = "KAGE BUNSHIN NO JUTSU!";
-                statusDiv.style.color = "#FFD700";
-                cloneData = image;
-            }
-        }
-
-        function onResults(results) {
-            canvasCtx.save();
-            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
-            canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
-
-            if (results.multiHandLandmarks && results.multiHandLandmarks.length === 2) {
-                const h1 = results.multiHandLandmarks[0][8]; // Index Tip Hand 1
-                const h2 = results.multiHandLandmarks[1][8]; // Index Tip Hand 2
+                <!-- Tab Content: New Shinobi -->
+                <div id="content-new-shinobi" class="tab-content" style="display:block;">
+                    <div class="registration-form">
+                        <div class="form-group">
+                            <label for="shinobi-name">Shinobi Name</label>
+                            <input type="text" id="shinobi-name" class="form-input" placeholder="Enter your name..." value="Naruto">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Select Nature Element (LOCKED ON REGISTRATION)</label>
+                            <div class="chakra-selector-grid">
+                                <button class="chakra-btn-select selected" data-affinity="wind">
+                                    <div class="dot"></div>
+                                    <span>WIND NATURE</span>
+                                </button>
+                                <button class="chakra-btn-select" data-affinity="lightning">
+                                    <div class="dot"></div>
+                                    <span>LIGHTNING NATURE</span>
+                                </button>
+                                <button class="chakra-btn-select" data-affinity="fire">
+                                    <div class="dot"></div>
+                                    <span>FIRE NATURE</span>
+                                </button>
+                                <button class="chakra-btn-select" data-affinity="shadow">
+                                    <div class="dot"></div>
+                                    <span>SHADOW NATURE</span>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <button id="btn-start-dojo" class="btn-enter-dojo">Register & Enter Dojo</button>
+                    </div>
+                </div>
                 
-                const dist = Math.hypot(h1.x - h2.x, h1.y - h2.y);
+                <!-- Tab Content: Load Scroll -->
+                <div id="content-load-scroll" class="tab-content" style="display:none; text-align:center;">
+                    <div id="saved-profile-box" style="background: rgba(255,255,255,0.03); border:1px solid var(--border-color); border-radius:12px; padding:20px; max-width:400px; margin:0 auto 20px auto; display:none; flex-direction:column; gap:6px;">
+                        <div style="font-family:'Share Tech Mono', monospace; font-size:1.4rem; font-weight:bold; color:var(--active-chakra); text-transform:uppercase;" id="saved-profile-name">NARUTO</div>
+                        <div style="font-size:0.8rem; color:var(--text-secondary); text-transform:uppercase; font-weight:bold; letter-spacing:2px;" id="saved-profile-nature">WIND NATURE</div>
+                        <div style="display:flex; justify-content:space-around; margin-top:15px; font-family:'Share Tech Mono', monospace; font-size:0.9rem; border-top:1px solid var(--border-color); padding-top:12px;">
+                            <div>RANK: <span id="saved-profile-rank" style="color:#ffaa00; font-weight:bold;">GENIN</span></div>
+                            <div>XP: <span id="saved-profile-xp" style="color:#00d2ff; font-weight:bold;">0/50</span></div>
+                        </div>
+                    </div>
+                    <div id="no-saved-profile-msg" style="color:var(--text-secondary); font-family:'Share Tech Mono', monospace; padding:30px 0;">
+                        No saved shinobi scroll found. Register a new character to start training!
+                    </div>
+                    <button id="btn-load-dojo" class="btn-enter-dojo" style="display:none; max-width:400px; margin:0 auto;">Unseal Scroll & Enter Dojo</button>
+                </div>
+            </section>
+        </div>
+    </div>
 
-                if (dist < 0.07) {
-                    triggerJutsu(results.image);
-                }
-            } else {
-                isJutsuActive = false;
-                cloneData = null;
-                statusDiv.innerText = "FORM THE CROSS SEAL";
-                statusDiv.style.color = "white";
-            }
+    <!-- Main Workspace -->
+    <div class="app-container">
+        
+        <!-- LEFT PANEL: LOCKED JUTSUS & LIBRARY -->
+        <aside class="panel">
+            <div class="panel-header">
+                <h2>Scroll of Jutsus</h2>
+            </div>
+            
+            <div class="panel-content">
+                <div class="section-title">SHINOBI REGISTRY</div>
+                <div style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; text-align: center;">
+                    <div id="locked-name-badge" style="font-family: 'Share Tech Mono', monospace; font-size: 1.1rem; font-weight: bold; color: var(--active-chakra); letter-spacing: 1px;">NARUTO</div>
+                    <div id="locked-nature-badge" style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; margin-top: 4px; font-weight: bold; letter-spacing: 2px;">WIND NATURE (LOCKED)</div>
+                </div>
+                
+                <div class="section-title">AVAILABLE SECRETS</div>
+                
+                <!-- Wind Jutsu -->
+                <div class="scroll-card" id="card-wind" data-jutsu="RASENGAN">
+                    <div class="scroll-card-header">
+                        <span class="scroll-card-title">Rasengan 🤙</span>
+                        <span class="scroll-card-kanji">螺旋丸</span>
+                    </div>
+                    <p class="scroll-card-desc">Condenses spiraling chakra in the palm. Forms a swirling, glowing wind vortex.</p>
+                    <span class="scroll-card-seal">Seal: Shaka Sign (Thumb & Pinky extended)</span>
+                </div>
+                
+                <!-- Lightning Jutsu -->
+                <div class="scroll-card locked" id="card-lightning" data-jutsu="CHIDORI">
+                    <div class="scroll-card-header">
+                        <span class="scroll-card-title">Chidori 🤘</span>
+                        <span class="scroll-card-kanji">千鳥</span>
+                    </div>
+                    <p class="scroll-card-desc">Charges lightning chakra around the hand. Triggers electrical bolts and sparks.</p>
+                    <span class="scroll-card-seal">Seal: Rock Sign (Index & Pinky extended)</span>
+                </div>
 
-            if (cloneData && isJutsuActive) {
-                canvasCtx.globalAlpha = 0.7;
-                // Draw two clones slightly offset
-                canvasCtx.drawImage(cloneData, -canvasElement.width/4, 80, canvasElement.width/1.5, canvasElement.height/1.5);
-                canvasCtx.drawImage(cloneData, canvasElement.width/1.8, 80, canvasElement.width/1.5, canvasElement.height/1.5);
-                canvasCtx.globalAlpha = 1.0;
-            }
-            canvasCtx.restore();
-        }
+                <!-- Fire Jutsu -->
+                <div class="scroll-card locked" id="card-fire" data-jutsu="FIREBALL">
+                    <div class="scroll-card-header">
+                        <span class="scroll-card-title">Fireball Jutsu 🖐️</span>
+                        <span class="scroll-card-kanji">豪火球</span>
+                    </div>
+                    <p class="scroll-card-desc">Expels intense fire stream. Triggers flame particles and heat glows on screen.</p>
+                    <span class="scroll-card-seal">Seal: Open Palm (All fingers extended)</span>
+                </div>
 
-        const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
-        hands.setOptions({ maxNumHands: 2, modelComplexity: 1, minDetectionConfidence: 0.6 });
-        hands.onResults(onResults);
+                <!-- Shadow Jutsu -->
+                <div class="scroll-card locked" id="card-shadow" data-jutsu="SHADOW_CLONE">
+                    <div class="scroll-card-header">
+                        <span class="scroll-card-title">Shadow Clone ✌️</span>
+                        <span class="scroll-card-kanji">影分身</span>
+                    </div>
+                    <p class="scroll-card-desc">Splits user's chakra into duplicates. Triggers a flash of clones on the sides.</p>
+                    <span class="scroll-card-seal">Seal: Peace Sign (Index & Middle extended)</span>
+                </div>
 
-        const camera = new Camera(videoElement, {
-            onFrame: async () => {
-                canvasElement.width = videoElement.videoWidth;
-                canvasElement.height = videoElement.videoHeight;
-                await hands.send({image: videoElement});
-            },
-            facingMode: 'user'
-        });
-        camera.start().then(() => statusDiv.innerText = "READY");
-    </script>
+                <!-- Shinobi Library Search Section -->
+                <div class="section-title">SHINOBI LIBRARY</div>
+                <div style="display:flex; flex-direction:column; gap:10px;">
+                    <input type="text" id="lib-search" class="form-input" placeholder="Search 2,900+ Jutsus..." style="padding: 10px 14px; font-size: 0.85rem;">
+                    
+                    <!-- Search Results -->
+                    <div id="lib-results" style="max-height: 180px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;"></div>
+                    
+                    <!-- Detail View -->
+                    <div id="lib-details" style="display: none; background: rgba(0,0,0,0.35); border: 1px solid var(--border-color); border-radius: 8px; padding: 14px; font-size: 0.8rem; line-height: 1.45; max-height: 320px; overflow-y: auto;">
+                        <div id="lib-details-name" style="font-weight: bold; color: var(--active-chakra); font-family: 'Share Tech Mono', monospace; font-size: 0.95rem; margin-bottom: 2px;"></div>
+                        <div id="lib-details-type" style="font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; font-weight: bold; letter-spacing: 1px; margin-bottom: 8px;"></div>
+                        <div id="lib-details-desc" style="color: var(--text-primary);"></div>
+                        <div id="lib-details-seals" style="color: #ffcc00; font-family: 'Share Tech Mono', monospace; font-size: 0.75rem; margin-top: 10px; margin-bottom: 10px; font-weight: bold; display: none; padding: 6px; background: rgba(255, 204, 0, 0.05); border: 1px dashed rgba(255, 204, 0, 0.2); border-radius: 4px;"></div>
+                        <button id="btn-equip-jutsu" style="width: 100%; display: none; padding: 8px 12px; font-size: 0.75rem; margin-top: 10px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: var(--text-primary); font-family: 'Share Tech Mono', monospace; font-weight: bold; border-radius: 6px; cursor: pointer; transition: all 0.2s; letter-spacing: 1.5px; text-transform: uppercase; outline: none;"></button>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- CENTER AREA: DOJO CAMERA -->
+        <main class="dojo-center">
+            <header class="dojo-header">
+                <div class="dojo-logo">SHINOBI DOJO</div>
+                <div class="dojo-hud-stats">
+                    <div class="hud-stat-box">
+                        <span>VELOCITY:</span>
+                        <span id="speed-val" class="val">0</span>
+                    </div>
+                    <div class="hud-stat-box">
+                        <span>CHAKRA:</span>
+                        <span id="level-val" class="val">100</span><span>%</span>
+                    </div>
+                </div>
+            </header>
+
+            <div class="canvas-workspace">
+                <!-- Video feed -->
+                <video id="video_input" style="display:none;" playsinline></video>
+                
+                <!-- Main output canvas -->
+                <canvas id="output_canvas"></canvas>
+                
+                <!-- Overlay HUD display -->
+                <div id="status-overlay">INITIALIZING SENSORS...</div>
+                
+                <!-- Sustain Bar Count Down -->
+                <div id="sustain-bar-container">
+                    <div id="sustain-bar-fill"></div>
+                </div>
+                
+                <!-- Seals Combo HUD -->
+                <div id="combo-hud" class="combo-hud-container">
+                    <span class="combo-label-prefix">SEALS COMBO:</span>
+                    <div id="combo-steps"></div>
+                </div>
+                
+                <!-- Audio Analysis Spectrogram Card -->
+                <div id="audio-spec-card" class="audio-spec-container">
+                    <div class="audio-spec-header">
+                        <span class="audio-spec-title">CHAKRA ACOUSTICS</span>
+                        <div id="audio-mic-indicator" class="audio-mic-dot"></div>
+                    </div>
+                    <canvas id="spec-canvas" width="150" height="40"></canvas>
+                    <div class="audio-spec-stats">
+                        <div class="audio-stat-row"><span>STATE:</span><span id="spec-state">OFFLINE</span></div>
+                        <div class="audio-stat-row"><span>VOLUME:</span><span id="spec-volume">0%</span></div>
+                        <div class="audio-stat-row"><span>HF RATIO:</span><span id="spec-hfratio">0.00</span></div>
+                        <div class="audio-stat-row"><span>FLATNESS:</span><span id="spec-flatness">0.00</span></div>
+                    </div>
+                </div>
+                
+                <!-- Canvas Control buttons -->
+                <div class="canvas-controls">
+                    <button id="btn-release" class="btn-ctrl" disabled>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18.36 6.64a9 9 0 1 1-12.73 0M12 2v10"/></svg>
+                        RELEASE CHAKRA (STOP)
+                    </button>
+                    <button id="btn-capture" class="btn-ctrl">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
+                        SEAL SCROLL (SNAP)
+                    </button>
+                    <button id="btn-mirror" class="btn-ctrl">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 12a8 8 0 1 0-8 8"/><path d="M22 20h-6v-6"/><path d="M20 16l-4 4"/></svg>
+                        FLIP CAMERA
+                    </button>
+                    <button id="btn-tutor" class="btn-ctrl active-tutor">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                        JUTSU TUTOR (ON)
+                    </button>
+                    <button id="btn-cast-mode" class="btn-ctrl">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                        CAST: COMBO (PRO)
+                    </button>
+                </div>
+                
+                <!-- Exhaustion & Mini-game Screen Overlay -->
+                <div id="exhaustion-overlay">
+                    <div class="exhaustion-title">CHAKRA EXHAUSTED</div>
+                    <div class="exhaustion-desc">Your chakra reserves have been completely depleted! Gather the glowing chakra sparks on the screen to restore your energy.</div>
+                    <div class="game-progress-text">Sparks gathered: <span id="gathered-sparks-count">0</span> / 5</div>
+                </div>
+                
+                <!-- Transition screens -->
+                <div id="flash-screen" class="flash-screen"></div>
+                <div id="fire-glow" class="fire-glow"></div>
+                <div id="lightning-flash" class="lightning-flash"></div>
+            </div>
+        </main>
+
+        <!-- RIGHT PANEL: SHINOBI STATS -->
+        <aside class="panel panel-right">
+            <div class="panel-header">
+                <h2>Chakra Matrix</h2>
+            </div>
+            
+            <div class="panel-content">
+                <div class="section-title">SHINOBI PROFILE</div>
+                <div style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: 8px; padding: 16px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <span style="font-family:'Share Tech Mono', monospace; font-size:0.75rem; color:var(--text-secondary);">NINJA RANK:</span>
+                        <span id="rank-badge" style="font-weight:bold; font-size:0.9rem; color:#ffaa00; text-shadow:0 0 6px rgba(255,170,0,0.3);">ACADEMY STUDENT</span>
+                    </div>
+                    
+                    <div class="xp-container" style="margin-top: 12px;">
+                        <div style="display:flex; justify-content:space-between; font-size:0.75rem; font-family:'Share Tech Mono', monospace;">
+                            <span>NINJA EXPERIENCE (XP)</span>
+                            <span id="xp-val" style="color:#00d2ff; font-weight:bold;">0 / 50</span>
+                        </div>
+                        <div class="xp-bar-outer">
+                            <div id="xp-bar-fill" class="xp-bar-inner"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section-title">CHAKRA CAPACITY</div>
+                <div class="metric-box">
+                    <div style="display:flex; justify-content:space-between; font-size:0.85rem; font-family:'Share Tech Mono', monospace;">
+                        <span>RESERVES</span>
+                        <span id="cost-badge" style="color:#ff3333; font-weight:bold; font-size:0.8rem;">Cost: 35% / cast</span>
+                    </div>
+                    <div id="chakra-meter-box" class="chakra-meter-container">
+                        <div class="chakra-meter-fill"></div>
+                    </div>
+                    <div id="supercharged-notice" style="font-size:0.75rem; color:var(--text-secondary); line-height:1.4;">
+                        Move your hands rapidly to build velocity. At Kage rank, you unlock infinite chakra!
+                    </div>
+                </div>
+                
+                <div class="section-title">ACTIVE JUTSU</div>
+                <div class="stats-grid">
+                    <div class="stat-item" style="grid-column: span 2;">
+                        <div class="stat-label">FORMULA SPELL</div>
+                        <div id="active-jutsu-val" class="stat-val" style="color:var(--active-chakra); transition:color 0.2s;">NONE</div>
+                    </div>
+                </div>
+                
+                <div class="section-title">JUTSU METRICS LOG</div>
+                <div id="log-console" class="log-console">
+                    <div class="log-entry">Dojo console online. Waiting for hand tracking...</div>
+                </div>
+                
+                <div class="section-title">SCROLLS GALLERY (SNAPSHOTS)</div>
+                <div id="gallery-grid" class="gallery-grid">
+                    <div class="gallery-empty">No snaps captured yet. Click "Seal Scroll" to snap a clone moment!</div>
+                </div>
+            </div>
+        </aside>
+        
+    </div>
+
+    <!-- Virtual Cursor for Air Gestures/Dwell Clicker -->
+    <div id="virtual-cursor" style="position: fixed; width: 26px; height: 26px; border: 2.5px solid var(--active-chakra); border-radius: 50%; pointer-events: none; z-index: 10000; transform: translate(-50%, -50%); display: none; box-shadow: 0 0 10px var(--active-glow); background: rgba(255, 255, 255, 0.1); transition: transform 0.05s ease;">
+        <svg width="26" height="26" style="position: absolute; top: -2.5px; left: -2.5px; transform: rotate(-90deg);">
+            <circle r="12" cx="13" cy="13" fill="transparent" stroke="#ffaa00" stroke-width="2.5" stroke-dasharray="76" stroke-dashoffset="76" id="virtual-cursor-progress" style="transition: stroke-dashoffset 0.1s linear;"></circle>
+        </svg>
+    </div>
+
+    <!-- Application Script -->
+    <script src="app.js"></script>
 </body>
 </html>
