@@ -79,10 +79,7 @@ let isScrollMode = false;
 let lastScrollHandY = 0;
 let singleTapTimeout = null;
 
-// Audio Blow Detector States
-let isBlowing = false;
-let audioContext = null;
-let audioAnalyser = null;
+// Audio Blow Detector States (Microphone removed)
 
 
 let activeJutsu = 'NONE';
@@ -1215,162 +1212,7 @@ function resetDwellProgress() {
     }
 }
 
-// Initialize Microphone Blow Detector
-// Initialize Microphone Blow & Spell-Cry Detector
-function initBlowDetector() {
-    if (audioContext) return;
-    
-    navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
-        audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        const source = audioContext.createMediaStreamSource(stream);
-        audioAnalyser = audioContext.createAnalyser();
-        audioAnalyser.fftSize = 512; // 256 frequency bins
-        source.connect(audioAnalyser);
-        
-        const bufferLength = audioAnalyser.frequencyBinCount;
-        const dataArray = new Uint8Array(bufferLength);
-        
-        const micIndicator = document.getElementById('audio-mic-indicator');
-        if (micIndicator) {
-            micIndicator.classList.add('active');
-        }
-        
-        function checkBlow() {
-            if (!audioAnalyser) return;
-            audioAnalyser.getByteFrequencyData(dataArray);
-            
-            // Compute average volume amplitude
-            let sum = 0;
-            for (let i = 0; i < bufferLength; i++) {
-                sum += dataArray[i];
-            }
-            const average = sum / bufferLength;
-            
-            // DSP Frequency Breakdown
-            let voiceEnergy = 0;
-            let blowEnergy = 0;
-            
-            // Bins 0 to 10 (approx 0 - 900 Hz, covering voiced fundamentals)
-            for (let i = 0; i <= 10; i++) {
-                voiceEnergy += dataArray[i];
-            }
-            // Bins 11 to 45 (approx 1000 - 4000 Hz, covering breath friction frequencies)
-            for (let i = 11; i <= 45; i++) {
-                blowEnergy += dataArray[i];
-            }
-            
-            // HF-to-LF Spectral Energy Ratio
-            const hfRatio = blowEnergy / (voiceEnergy + 1);
-            
-            // Spectral Flatness (Wiener Entropy) over first 45 bins
-            let logSum = 0;
-            let linearSum = 0;
-            const numFlatnessBins = 45;
-            for (let i = 0; i < numFlatnessBins; i++) {
-                const val = dataArray[i];
-                logSum += Math.log(val + 1);
-                linearSum += val;
-            }
-            const geomMean = Math.exp(logSum / numFlatnessBins);
-            const arithMean = (linearSum / numFlatnessBins) + 1;
-            const flatness = geomMean / arithMean;
-            
-            // Multi-dimensional Classification State Machine
-            let state = 'SILENT';
-            if (average < 10) {
-                state = 'SILENT';
-            } else if (hfRatio > 1.2 && flatness > 0.35) {
-                state = 'BLOWING 💨';
-            } else if (flatness < 0.22 && average > 20) {
-                state = 'SPELL CRY 🗣️';
-            } else {
-                state = 'SPEAKING';
-            }
-            
-            // Handle Fireball invocation triggers
-            if (activeJutsu === 'FIREBALL') {
-                if (state === 'BLOWING 💨') {
-                    isBlowing = true;
-                    triggerFireballBlast(false);
-                } else if (state === 'SPELL CRY 🗣️') {
-                    isBlowing = true;
-                    triggerFireballBlast(true);
-                } else {
-                    isBlowing = false;
-                }
-            } else {
-                isBlowing = false;
-            }
-            
-            // Update Spectrogram GUI Card
-            const stateEl = document.getElementById('spec-state');
-            const volEl = document.getElementById('spec-volume');
-            const hfEl = document.getElementById('spec-hfratio');
-            const flatEl = document.getElementById('spec-flatness');
-            const canvas = document.getElementById('spec-canvas');
-            
-            if (stateEl) {
-                stateEl.innerText = state;
-                if (state === 'BLOWING 💨') stateEl.style.color = '#ff5500';
-                else if (state === 'SPELL CRY 🗣️') stateEl.style.color = '#b500ff';
-                else if (state === 'SPEAKING') stateEl.style.color = '#00e676';
-                else stateEl.style.color = '#888888';
-            }
-            if (volEl) volEl.innerText = `${Math.round((average / 255) * 100)}%`;
-            if (hfEl) hfEl.innerText = hfRatio.toFixed(2);
-            if (flatEl) flatEl.innerText = flatness.toFixed(2);
-            
-            if (canvas) {
-                const ctx = canvas.getContext('2d');
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                
-                // Draw grid lines
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
-                ctx.lineWidth = 1;
-                for (let x = 30; x < canvas.width; x += 30) {
-                    ctx.beginPath();
-                    ctx.moveTo(x, 0);
-                    ctx.lineTo(x, canvas.height);
-                    ctx.stroke();
-                }
-                
-                // Draw frequency bins (first 40 bins)
-                const barWidth = canvas.width / 40;
-                for (let i = 0; i < 40; i++) {
-                    const val = dataArray[i];
-                    const pct = val / 255;
-                    const h = canvas.height * pct;
-                    
-                    const grad = ctx.createLinearGradient(0, canvas.height - h, 0, canvas.height);
-                    if (state === 'BLOWING 💨') {
-                        grad.addColorStop(0, '#ff5500');
-                        grad.addColorStop(1, '#ffaa00');
-                    } else if (state === 'SPELL CRY 🗣️') {
-                        grad.addColorStop(0, '#b500ff');
-                        grad.addColorStop(1, '#00d2ff');
-                    } else if (state === 'SPEAKING') {
-                        grad.addColorStop(0, '#00e676');
-                        grad.addColorStop(1, '#aaeedd');
-                    } else {
-                        grad.addColorStop(0, 'rgba(0, 210, 255, 0.6)');
-                        grad.addColorStop(1, 'rgba(0, 210, 255, 0.2)');
-                    }
-                    
-                    ctx.fillStyle = grad;
-                    ctx.fillRect(i * barWidth, canvas.height - h, barWidth - 1, h);
-                }
-            }
-            
-            requestAnimationFrame(checkBlow);
-        }
-        checkBlow();
-    }).catch(err => {
-        console.warn("Microphone not available or permission denied for blow detection:", err);
-        addLogEntry("Mic blow detection unavailable. Use SPACEBAR to blow fireball.");
-        const stateEl = document.getElementById('spec-state');
-        if (stateEl) stateEl.innerText = "DENIED/OFFLINE";
-    });
-}
+// (Microphone blow detection function excised)
 
 // Spawn fireball blast particles that expand and travel forward in 3D perspective
 function triggerFireballBlast(isVoiceActivated = false) {
@@ -1548,7 +1390,7 @@ function emitSmoke(x, y, count = 25) {
 // Spawn aura bubbles
 function emitAura(x, y) {
     if (Math.random() > 0.45) return; // lower emission frequency
-    const theme = THEMES[currentAffinity];
+    const theme = THEMES[currentAffinity] || THEMES.wind;
     const vx = (Math.random() - 0.5) * 1.0;
     const vy = -1 - Math.random() * 1.5;
     particles.push(new Particle(x, y, 'aura', theme.color, 4 + Math.random() * 3, vx, vy, 20 + Math.random() * 10)); // shorter life
@@ -2197,7 +2039,7 @@ function drawLoop() {
         drawTargetReticle(canvasCtx, targetLockPos.x * canvasElement.width, targetLockPos.y * canvasElement.height);
     }
     
-    const theme = THEMES[currentAffinity];
+    const theme = THEMES[currentAffinity] || THEMES.wind;
     const isSupercharged = (chakraLevel > 70) || isComboSupercharged;
     
     let handDetected = false;
@@ -2304,6 +2146,10 @@ function drawLoop() {
         } else if (activeJutsu === 'FIREBALL') {
             fireGlow.style.boxShadow = `inset 0 0 ${isSupercharged ? '120px' : '70px'} rgba(255, 30, 0, 0.45)`;
             emitFire(handX, handY, isSupercharged);
+            // Automatically launch fireball blasts periodically during casting (no blowing required)
+            if (Math.random() > 0.45) {
+                triggerFireballBlast(isSupercharged);
+            }
         }
     }
     
@@ -2399,14 +2245,21 @@ function drawLoop() {
 }
 
 function drawSkeletonPath(ctx, landmarks, indices) {
+    if (!landmarks || landmarks.length === 0) return;
     const canvas = ctx.canvas;
     ctx.beginPath();
+    let first = true;
     for (let i = 0; i < indices.length; i++) {
         const pt = landmarks[indices[i]];
-        const px = pt.x * canvas.width; // Align with mirrored coordinate system
+        if (!pt) continue;
+        const px = pt.x * canvas.width;
         const py = pt.y * canvas.height;
-        if (i === 0) ctx.moveTo(px, py);
-        else ctx.lineTo(px, py);
+        if (first) {
+            ctx.moveTo(px, py);
+            first = false;
+        } else {
+            ctx.lineTo(px, py);
+        }
     }
     ctx.stroke();
 }
@@ -2426,7 +2279,6 @@ function updateAndDrawParticles(ctx) {
 // Start Camera and Detector
 async function startDojo() {
     initAudio();
-    initBlowDetector(); // Start audio analyser for blowing fireball
     resetCombo(); // Reset combo system
     const introScreen = document.getElementById('intro-screen');
     introScreen.style.opacity = '0';
@@ -2450,29 +2302,45 @@ async function startDojo() {
     
     handsDetector.onResults(onResults);
 
-    faceDetector = new FaceDetection({
-        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_detection/${file}`
-    });
-    
-    faceDetector.setOptions({
-        model: 'short',
-        minDetectionConfidence: 0.55
-    });
-    
-    faceDetector.onResults(onFaceResults);
+    try {
+        faceDetector = new FaceDetection({
+            locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_detection/${file}`
+        });
+        
+        faceDetector.setOptions({
+            model: 'short',
+            minDetectionConfidence: 0.55
+        });
+        
+        faceDetector.onResults(onFaceResults);
+    } catch (faceErr) {
+        console.warn("Face detector could not be initialized:", faceErr);
+        faceDetector = null;
+    }
     
     cameraManager = new Camera(videoElement, {
         onFrame: async () => {
             if (videoElement.videoWidth && videoElement.videoHeight) {
-                // Avoid resetting canvas buffer size unless it actually changes
                 if (canvasElement.width !== videoElement.videoWidth || canvasElement.height !== videoElement.videoHeight) {
                     canvasElement.width = videoElement.videoWidth;
                     canvasElement.height = videoElement.videoHeight;
                 }
-                await Promise.all([
-                    handsDetector.send({ image: videoElement }),
-                    faceDetector.send({ image: videoElement })
-                ]);
+                
+                try {
+                    if (handsDetector) {
+                        await handsDetector.send({ image: videoElement });
+                    }
+                } catch (handsErr) {
+                    console.error("Hands detection error in frame loop:", handsErr);
+                }
+                
+                try {
+                    if (faceDetector) {
+                        await faceDetector.send({ image: videoElement });
+                    }
+                } catch (faceErr) {
+                    console.error("Face detection error in frame loop:", faceErr);
+                }
             }
         },
         width: 640,
@@ -2519,10 +2387,21 @@ async function startDojo() {
                             canvasElement.width = videoElement.videoWidth;
                             canvasElement.height = videoElement.videoHeight;
                         }
-                        await Promise.all([
-                            handsDetector.send({ image: videoElement }),
-                            faceDetector.send({ image: videoElement })
-                        ]);
+                        try {
+                            if (handsDetector) {
+                                await handsDetector.send({ image: videoElement });
+                            }
+                        } catch (handsErr) {
+                            console.error("Fallback hands detection error:", handsErr);
+                        }
+                        
+                        try {
+                            if (faceDetector) {
+                                await faceDetector.send({ image: videoElement });
+                            }
+                        } catch (faceErr) {
+                            console.error("Fallback face detection error:", faceErr);
+                        }
                     }
                 } catch (e) {
                     console.error("Error sending fallback frame:", e);
@@ -2763,22 +2642,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
     
-    // Bind Spacebar key overrides to blow fireball
-    window.addEventListener('keydown', (e) => {
-        if (e.code === 'Space') {
-            e.preventDefault(); // prevent window scrolling
-            if (activeJutsu === 'FIREBALL') {
-                isBlowing = true;
-                triggerFireballBlast();
-            }
-        }
-    });
-    
-    window.addEventListener('keyup', (e) => {
-        if (e.code === 'Space') {
-            isBlowing = false;
-        }
-    });
+    // (Blowing mechanics removed)
     
     // Set default theme
     selectAffinity('wind');
