@@ -26,10 +26,7 @@ const activeJutsuVal = document.getElementById('active-jutsu-val');
 const logConsole = document.getElementById('log-console');
 const galleryGrid = document.getElementById('gallery-grid');
 
-// Sustain elements
-const sustainBarContainer = document.getElementById('sustain-bar-container');
-const sustainBarFill = document.getElementById('sustain-bar-fill');
-const btnRelease = document.getElementById('btn-release');
+
 const comboHud = document.getElementById('combo-hud');
 const comboSteps = document.getElementById('combo-steps');
 
@@ -87,10 +84,6 @@ let isBlowing = false;
 let audioContext = null;
 let audioAnalyser = null;
 
-let handAbsenceFrames = 0; // debounce hand absence for stable release
-let isSustained = false;
-let sustainTimeRemaining = 0.0;
-const SUSTAIN_DURATION = 8.0; // 8 seconds sustain
 
 let activeJutsu = 'NONE';
 let jutsuHoldFrames = 0;
@@ -1789,9 +1782,7 @@ function classifyGestures(landmarks) {
 }
 
 function invokeJutsu(jutsuName) {
-    isSustained = true;
     activeJutsu = jutsuName;
-    sustainTimeRemaining = SUSTAIN_DURATION;
     
     // Get display name based on equipped Jutsus
     const nature = getJutsuAffinity(jutsuName);
@@ -1810,17 +1801,14 @@ function invokeJutsu(jutsuName) {
         statusOverlay.classList.add('supercharged-pulse');
     }
     
-    // Enable release controls and HUD sustain indicators
-    btnRelease.disabled = false;
     activeJutsuVal.innerText = finalDisplayName;
-    sustainBarContainer.style.display = 'block';
     
     // Cast effects
     if (activeJutsu === 'SHADOW_CLONE') {
         flashScreen.style.opacity = '1';
         setTimeout(() => { flashScreen.style.opacity = '0'; }, 150);
         playPoofSound();
-        emitSmoke(lastKnownHandPos.x * 640, lastKnownHandPos.y * 480, 30);
+        emitSmoke(lastKnownHandPos.x * canvasElement.width, lastKnownHandPos.y * canvasElement.height, 30);
         
         // Capture a snapshot of the user's mirrored webcam feed for the clones
         const tempCanvas = document.createElement('canvas');
@@ -1864,19 +1852,10 @@ function invokeJutsu(jutsuName) {
 }
 
 function releaseJutsu() {
-    if (!isSustained) return;
+    if (activeJutsu === 'NONE') return;
     
     const nature = getJutsuAffinity(activeJutsu);
     const displayName = equippedJutsuDisplayNames[nature] || activeJutsu;
-    
-    // Refund unused chakra (preserve chakra)
-    if (sustainTimeRemaining > 0 && currentChakraCost > 0) {
-        const refundAmount = currentChakraCost * (sustainTimeRemaining / SUSTAIN_DURATION);
-        chakraLevel = Math.min(100, chakraLevel + refundAmount);
-        levelVal.innerText = Math.round(chakraLevel).toString();
-        chakraMeterFill.style.width = `${chakraLevel}%`;
-        addLogEntry(`Chakra preserved: +${Math.round(refundAmount)}% refunded.`);
-    }
     
     addLogEntry(`${displayName} jutsu released.`);
     
@@ -1887,21 +1866,17 @@ function releaseJutsu() {
         lightningFlash.style.backgroundColor = 'rgba(200, 240, 255, 0)';
     } else if (activeJutsu === 'SHADOW_CLONE') {
         playPoofSound();
-        emitSmoke(lastKnownHandPos.x * 640, lastKnownHandPos.y * 480, 20);
+        emitSmoke(lastKnownHandPos.x * canvasElement.width, lastKnownHandPos.y * canvasElement.height, 20);
         cloneData = null;
     }
     
-    isSustained = false;
     activeJutsu = 'NONE';
-    sustainTimeRemaining = 0.0;
     resetCombo();
     
     statusOverlay.innerText = isExhausted ? 'CHAKRA EXHAUSTED' : 'FORM A SEAL';
     statusOverlay.classList.remove('jutsu-active');
     statusOverlay.classList.remove('supercharged-pulse');
     activeJutsuVal.innerText = 'NONE';
-    sustainBarContainer.style.display = 'none';
-    btnRelease.disabled = true;
     
     document.querySelectorAll('.scroll-card').forEach(card => {
         card.classList.remove('active');
@@ -2055,176 +2030,46 @@ function onResults(results) {
     
     // JUTSU LOGIC FLOW
     if (!isExhausted) {
-        if (!isSustained) {
-            const currentDetectedSeal = classifyGestures(results.multiHandLandmarks);
-            
-            // Debounce to establish a stable seal (require 2 frames)
-            if (currentDetectedSeal !== 'NONE') {
-                if (currentDetectedSeal === lastDetectedSeal) {
-                    sealStableFrames++;
-                } else {
-                    lastDetectedSeal = currentDetectedSeal;
-                    sealStableFrames = 1;
+        const currentDetectedSeal = classifyGestures(results.multiHandLandmarks);
+        
+        // Debounce to establish a stable seal (require 2 frames)
+        if (currentDetectedSeal !== 'NONE') {
+            if (currentDetectedSeal === lastDetectedSeal) {
+                sealStableFrames++;
+            } else {
+                lastDetectedSeal = currentDetectedSeal;
+                sealStableFrames = 1;
+            }
+        } else {
+            sealStableFrames = 0;
+            lastDetectedSeal = 'NONE';
+        }
+        
+        const stableSeal = (sealStableFrames >= 2) ? lastDetectedSeal : 'NONE';
+        
+        if (stableSeal !== 'NONE') {
+            if (isJutsuUnlocked(stableSeal)) {
+                if (activeJutsu !== stableSeal) {
+                    if (activeJutsu !== 'NONE') {
+                        releaseJutsu();
+                    }
+                    invokeJutsu(stableSeal);
                 }
             } else {
-                sealStableFrames = 0;
-                lastDetectedSeal = 'NONE';
-            }
-            
-            const stableSeal = (sealStableFrames >= 2) ? lastDetectedSeal : 'NONE';
-            
-            // Process combo timeout
-            const now = performance.now();
-            if (activeComboJutsu !== 'NONE') {
-                const elapsed = now - comboStartTime;
-                if (elapsed > COMBO_WINDOW_MS) {
-                    addLogEntry(`Combo timed out - chakra dissipated.`, false);
-                    resetCombo();
-                } else {
-                    // Update live combo timer fill width
-                    const timerFill = document.getElementById('combo-timer-fill');
-                    if (timerFill) {
-                        const pct = Math.max(0, (1 - (elapsed / COMBO_WINDOW_MS)) * 100);
-                        timerFill.style.width = `${pct}%`;
-                    }
-                }
-            }
-            
-            // Spell invocation / Combo state machine
-            if (stableSeal !== 'NONE') {
+                // Locked feedback
                 const affinity = getJutsuAffinity(stableSeal);
                 const displayName = equippedJutsuDisplayNames[affinity] || stableSeal;
-                
-                if (castMode === 'instant') {
-                    // Easy Mode: Instant spell activation on single stable hand seal
-                    if (isJutsuUnlocked(stableSeal)) {
-                        invokeJutsu(stableSeal);
-                    } else {
-                        // Log locked feedback
-                        const dist = getAffinityDistance(currentAffinity, affinity);
-                        const neededRank = dist === 2 ? 'JONIN (Rank 4)' : 'GENIN (Rank 2)';
-                        if (lastDetectedSeal !== stableSeal) {
-                            addLogEntry(`🔒 ${displayName} is LOCKED! Requires rank ${neededRank}`, false);
-                            lastDetectedSeal = stableSeal; // prevent log spam
-                        }
-                    }
-                } else {
-                    // Pro Mode: 3-step Combo sequence recognition
-                    if (activeComboJutsu === 'NONE') {
-                        // Start combo if stable seal is the starting seal of an unlocked Jutsu
-                        if (JUTSU_COMBOS[stableSeal]) {
-                            if (isJutsuUnlocked(stableSeal)) {
-                                activeComboJutsu = stableSeal;
-                                activeComboProgress = 1;
-                                comboStartTime = now;
-                                lastComboStepTime = now;
-                                comboSyncScore = 100;
-                                incorrectSealFrames = 0;
-                                isComboSupercharged = false;
-                                
-                                playComboStepSound(1, stableSeal);
-                                emitComboStepParticles(lastKnownHandPos.x * canvasElement.width, lastKnownHandPos.y * canvasElement.height, stableSeal, 1);
-                                addLogEntry(`[Combo Start] Formed ${displayName} Seal 1/3 ${GESTURE_EMOJIS[stableSeal]}`, true);
-                                updateComboHUD(activeComboJutsu, activeComboProgress);
-                            } else {
-                                // Locked Jutsu feedback
-                                const dist = getAffinityDistance(currentAffinity, affinity);
-                                const neededRank = dist === 2 ? 'JONIN (Rank 4)' : 'GENIN (Rank 2)';
-                                if (lastDetectedSeal !== stableSeal) {
-                                    addLogEntry(`🔒 ${displayName} is LOCKED! Requires rank ${neededRank}`, false);
-                                    lastDetectedSeal = stableSeal;
-                                }
-                            }
-                        }
-                    } else {
-                    // A combo is already active
-                    const sequence = JUTSU_COMBOS[activeComboJutsu];
-                    const nextRequiredSeal = sequence[activeComboProgress];
-                    
-                    if (stableSeal === nextRequiredSeal) {
-                        // Progress combo steps
-                        const elapsed = now - lastComboStepTime;
-                        lastComboStepTime = now;
-                        
-                        if (elapsed > 850) {
-                            comboSyncScore = Math.max(50, comboSyncScore - Math.min(25, (elapsed - 850) / 75));
-                        } else {
-                            comboSyncScore = Math.min(100, comboSyncScore + 5);
-                        }
-                        
-                        activeComboProgress++;
-                        incorrectSealFrames = 0;
-                        
-                        if (activeComboProgress === 2) {
-                            playComboStepSound(2, activeComboJutsu);
-                            emitComboStepParticles(lastKnownHandPos.x * canvasElement.width, lastKnownHandPos.y * canvasElement.height, activeComboJutsu, 2);
-                            addLogEntry(`[Combo Progress] Formed Seal 2/3 ${GESTURE_EMOJIS[stableSeal]} (Sync: ${Math.round(comboSyncScore)}%)`, true);
-                            updateComboHUD(activeComboJutsu, activeComboProgress);
-                        } else if (activeComboProgress === 3) {
-                            // Combo completed successfully!
-                            isComboSupercharged = (comboSyncScore >= 85);
-                            addLogEntry(`[Combo Complete] ${activeComboJutsu} FULLY SYNCED! (Sync: ${Math.round(comboSyncScore)}% ${isComboSupercharged ? '- SUPERCHARGED' : ''})`, true);
-                            
-                            triggerScreenShake();
-                            invokeJutsu(activeComboJutsu);
-                            
-                            activeComboJutsu = 'NONE';
-                            activeComboProgress = 0;
-                            updateComboHUD('NONE', 0);
-                        }
-                    } else if (stableSeal === sequence[activeComboProgress - 1]) {
-                        // Still holding the seal from the previous step
-                        incorrectSealFrames = 0;
-                    } else {
-                        // Check if pivoting to start a different unlocked combo
-                        if (JUTSU_COMBOS[stableSeal] && isJutsuUnlocked(stableSeal)) {
-                            activeComboJutsu = stableSeal;
-                            activeComboProgress = 1;
-                            comboStartTime = now;
-                            lastComboStepTime = now;
-                            comboSyncScore = 100;
-                            incorrectSealFrames = 0;
-                            isComboSupercharged = false;
-                            
-                            playComboStepSound(1, stableSeal);
-                            emitComboStepParticles(lastKnownHandPos.x * canvasElement.width, lastKnownHandPos.y * canvasElement.height, stableSeal, 1);
-                            addLogEntry(`[Combo Switch] Pivoted to ${displayName} Seal 1/3 ${GESTURE_EMOJIS[stableSeal]}`, true);
-                            updateComboHUD(activeComboJutsu, activeComboProgress);
-                        } else {
-                            // Holding an incorrect stable seal
-                            incorrectSealFrames++;
-                            if (incorrectSealFrames >= 10) {
-                                addLogEntry(`Combo broken - unstable chakra seals!`, false);
-                                resetCombo();
-                            }
-                        }
-                    }
+                const dist = getAffinityDistance(currentAffinity, affinity);
+                const neededRank = dist === 2 ? 'JONIN (Rank 4)' : 'GENIN (Rank 2)';
+                if (lastDetectedSeal !== stableSeal) {
+                    addLogEntry(`🔒 ${displayName} is LOCKED! Requires rank ${neededRank}`, false);
+                    lastDetectedSeal = stableSeal;
                 }
             }
         } else {
-                // In transition (NONE)
-                incorrectSealFrames = 0;
-            }
-        } else {
-            // Check if hand is still detected on screen (with 3-frame debounce)
-            const currentHandCount = (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) ? results.multiHandLandmarks.length : 0;
-            
-            if (currentHandCount === 0) {
-                handAbsenceFrames++;
-                if (handAbsenceFrames >= 3) { // 3 consecutive frames of no hand (about 50ms)
-                    handAbsenceFrames = 0;
-                    addLogEntry("Hand removed from screen. Releasing Jutsu.", true);
-                    releaseJutsu();
-                }
-            } else {
-                handAbsenceFrames = 0; // reset debounce
-                
-                sustainTimeRemaining -= dt;
-                sustainBarFill.style.width = `${(sustainTimeRemaining / SUSTAIN_DURATION) * 100}%`;
-                
-                if (sustainTimeRemaining <= 0) {
-                    releaseJutsu();
-                }
+            // stableSeal is 'NONE'
+            if (activeJutsu !== 'NONE') {
+                releaseJutsu();
             }
         }
     }
@@ -2421,7 +2266,7 @@ function drawLoop() {
     }
     
     // JUTSU RENDERING FLOW
-    if (!isExhausted && isSustained) {
+    if (!isExhausted && activeJutsu !== 'NONE') {
         const handX = lastKnownHandPos.x * canvasElement.width;
         const handY = lastKnownHandPos.y * canvasElement.height;
         
@@ -2876,11 +2721,7 @@ document.addEventListener('DOMContentLoaded', () => {
             libResults.appendChild(item);
         });
     });
-    
-    // Bind Release/Stop Control Button
-    btnRelease.addEventListener('click', () => {
-        releaseJutsu();
-    });
+
     
     // Bind Capture Control Button
     document.getElementById('btn-capture').addEventListener('click', () => {
