@@ -1581,43 +1581,18 @@ function isFingerCurled(hand, tipIdx, pipIdx) {
 }
 
 function classifyGestures(landmarks) {
-    if (!landmarks || landmarks.length === 0 || isExhausted) {
+    if (!landmarks || landmarks.length !== 2 || isExhausted) {
         return 'NONE';
     }
     
-    // Check all detected hands so user can invoke jutsu from either hand
-    for (let h = 0; h < landmarks.length; h++) {
-        const hand = landmarks[h];
-        const palmSize = getDist(hand[0], hand[9]); // Wrist (0) to Middle MCP (9)
-        if (palmSize < 0.01) continue;
-        
-        // Evaluate extend/curl states for the 4 fingers using PIP joints
-        const idxExt  = isFingerExtended(hand, 8, 6);
-        const midExt  = isFingerExtended(hand, 12, 10);
-        const ringExt = isFingerExtended(hand, 16, 14);
-        const pkyExt  = isFingerExtended(hand, 20, 18);
-        
-        const idxCrl  = isFingerCurled(hand, 8, 6);
-        const midCrl  = isFingerCurled(hand, 12, 10);
-        const ringCrl = isFingerCurled(hand, 16, 14);
-        const pkyCrl  = isFingerCurled(hand, 20, 18);
-        
-        // 1. Fire Release (Fireball): Flat hand with all fingers extended
-        const isFireSeal = idxExt && midExt && ringExt && pkyExt;
-        if (isFireSeal) return 'FIREBALL';
-        
-        // 2. Wind Release (Rasengan): Thumb and pinky extended, other fingers curled
-        const isThumbExtended = getDist(hand[4], hand[0]) > getDist(hand[3], hand[0]) * 1.01; // compare tip (4) to IP (3) (relaxed from 1.05)
-        const isWindSeal = isThumbExtended && pkyExt && idxCrl && midCrl && ringCrl;
-        if (isWindSeal) return 'RASENGAN';
-        
-        // 3. Lightning Release (Chidori): Index and pinky extended, middle and ring curled
-        const isLightningSeal = idxExt && pkyExt && midCrl && ringCrl;
-        if (isLightningSeal) return 'CHIDORI';
-        
-        // 4. Confrontation Seal (Shadow Clone): Index and middle fingers extended, others curled
-        const isConfrontationSeal = idxExt && midExt && ringCrl && pkyCrl;
-        if (isConfrontationSeal) return 'SHADOW_CLONE';
+    const h1 = landmarks[0][8]; // Index Tip Hand 1
+    const h2 = landmarks[1][8]; // Index Tip Hand 2
+    
+    if (h1 && h2) {
+        const dist = Math.hypot(h1.x - h2.x, h1.y - h2.y);
+        if (dist < 0.07) {
+            return trainingTargetJutsu !== 'NONE' ? trainingTargetJutsu : lockedJutsu;
+        }
     }
     
     return 'NONE';
