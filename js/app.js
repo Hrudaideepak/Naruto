@@ -145,8 +145,7 @@ let isCameraRunning = false;
 
 // Jutsu Tutor and Hand Calibration Guide States
 let trainingTargetJutsu = 'RASENGAN';
-let isTutorEnabled = true;
-let castMode = 'combo'; // 'combo' (requires 3-step sequence) or 'instant' (instant trigger on single seal)
+let castMode = 'instant'; // 'combo' (requires 3-step sequence) or 'instant' (instant trigger on single seal)
 
 const GESTURE_TEMPLATES = {
     'FIREBALL': [
@@ -724,233 +723,6 @@ function isJutsuUnlocked(jutsuName) {
     return false;
 }
 
-// Hand calibration checker for a specific targeted Jutsu
-function getFingerCalibration(hand, targetJutsu) {
-    if (!hand) return null;
-    
-    const thumbExt = getDist(hand[4], hand[0]) > getDist(hand[3], hand[0]) * 1.05;
-    const indexExt = isFingerExtended(hand, 8, 6);
-    const middleExt = isFingerExtended(hand, 12, 10);
-    const ringExt = isFingerExtended(hand, 16, 14);
-    const pinkyExt = isFingerExtended(hand, 20, 18);
-    
-    const indexCrl = isFingerCurled(hand, 8, 6);
-    const middleCrl = isFingerCurled(hand, 12, 10);
-    const ringCrl = isFingerCurled(hand, 16, 14);
-    const pinkyCrl = isFingerCurled(hand, 20, 18);
-    
-    const result = {
-        thumb: { name: 'Thumb', ok: false, desc: '' },
-        index: { name: 'Index', ok: false, desc: '' },
-        middle: { name: 'Middle', ok: false, desc: '' },
-        ring: { name: 'Ring', ok: false, desc: '' },
-        pinky: { name: 'Pinky', ok: false, desc: '' }
-    };
-    
-    if (targetJutsu === 'RASENGAN') {
-        result.thumb.ok = thumbExt;
-        result.thumb.desc = thumbExt ? 'EXTENDED (OK)' : 'EXTEND IT';
-        
-        result.index.ok = indexCrl;
-        result.index.desc = indexCrl ? 'CURLED (OK)' : 'CURL IT';
-        
-        result.middle.ok = middleCrl;
-        result.middle.desc = middleCrl ? 'CURLED (OK)' : 'CURL IT';
-        
-        result.ring.ok = ringCrl;
-        result.ring.desc = ringCrl ? 'CURLED (OK)' : 'CURL IT';
-        
-        result.pinky.ok = pinkyExt;
-        result.pinky.desc = pinkyExt ? 'EXTENDED (OK)' : 'EXTEND IT';
-    } else if (targetJutsu === 'CHIDORI') {
-        result.thumb.ok = true; // thumb is don't care, default OK
-        result.thumb.desc = thumbExt ? 'EXTENDED' : 'CURLED';
-        
-        result.index.ok = indexExt;
-        result.index.desc = indexExt ? 'EXTENDED (OK)' : 'EXTEND IT';
-        
-        result.middle.ok = middleCrl;
-        result.middle.desc = middleCrl ? 'CURLED (OK)' : 'CURL IT';
-        
-        result.ring.ok = ringCrl;
-        result.ring.desc = ringCrl ? 'CURLED (OK)' : 'CURL IT';
-        
-        result.pinky.ok = pinkyExt;
-        result.pinky.desc = pinkyExt ? 'EXTENDED (OK)' : 'EXTEND IT';
-    } else if (targetJutsu === 'FIREBALL') {
-        result.thumb.ok = true;
-        result.thumb.desc = thumbExt ? 'EXTENDED' : 'CURLED';
-        
-        result.index.ok = indexExt;
-        result.index.desc = indexExt ? 'EXTENDED (OK)' : 'EXTEND IT';
-        
-        result.middle.ok = middleExt;
-        result.middle.desc = middleExt ? 'EXTENDED (OK)' : 'EXTEND IT';
-        
-        result.ring.ok = ringExt;
-        result.ring.desc = ringExt ? 'EXTENDED (OK)' : 'EXTEND IT';
-        
-        result.pinky.ok = pinkyExt;
-        result.pinky.desc = pinkyExt ? 'EXTENDED (OK)' : 'EXTEND IT';
-    } else if (targetJutsu === 'SHADOW_CLONE') {
-        result.thumb.ok = true;
-        result.thumb.desc = thumbExt ? 'EXTENDED' : 'CURLED';
-        
-        result.index.ok = indexExt;
-        result.index.desc = indexExt ? 'EXTENDED (OK)' : 'EXTEND IT';
-        
-        result.middle.ok = middleExt;
-        result.middle.desc = middleExt ? 'EXTENDED (OK)' : 'EXTEND IT';
-        
-        result.ring.ok = ringCrl;
-        result.ring.desc = ringCrl ? 'CURLED (OK)' : 'CURL IT';
-        
-        result.pinky.ok = pinkyCrl;
-        result.pinky.desc = pinkyCrl ? 'CURLED (OK)' : 'CURL IT';
-    }
-    
-    return result;
-}
-
-// Draw a dotted schematic ghost hand of the target gesture inside a bounding box
-function drawGhostHandTemplate(ctx, templateName, rx, ry, rw, rh) {
-    const template = GESTURE_TEMPLATES[templateName];
-    if (!template) return;
-    
-    ctx.save();
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
-    ctx.lineWidth = 1.8;
-    ctx.setLineDash([2, 2]);
-    
-    const getCanvasPt = (pt) => {
-        return {
-            x: rx + rw / 2 + pt.x * (rw * 1.3),
-            y: ry + rh / 2 + (pt.y - 0.05) * (rh * 1.3)
-        };
-    };
-    
-    const drawTemplatePath = (indices) => {
-        ctx.beginPath();
-        for (let i = 0; i < indices.length; i++) {
-            const pt = getCanvasPt(template[indices[i]]);
-            if (i === 0) ctx.moveTo(pt.x, pt.y);
-            else ctx.lineTo(pt.x, pt.y);
-        }
-        ctx.stroke();
-    };
-    
-    drawTemplatePath([0, 1, 2, 3, 4]);
-    drawTemplatePath([0, 5, 6, 7, 8]);
-    drawTemplatePath([9, 10, 11, 12]);
-    drawTemplatePath([13, 14, 15, 16]);
-    drawTemplatePath([0, 17, 18, 19, 20]);
-    drawTemplatePath([5, 9, 13, 17]);
-    
-    // Draw joint dots
-    ctx.fillStyle = 'rgba(0, 210, 255, 0.6)';
-    for (let i = 0; i < template.length; i++) {
-        const pt = getCanvasPt(template[i]);
-        ctx.beginPath();
-        ctx.arc(pt.x, pt.y, 2.0, 0, Math.PI * 2);
-        ctx.fill();
-    }
-    
-    ctx.restore();
-}
-
-// Draw a beautifully styled interactive tutor HUD showing finger calibration and ghost guide
-function drawTutorHUDPanel(ctx, handLandmarks, targetJutsu, theme) {
-    const canvas = ctx.canvas;
-    const px = canvas.width - 205;
-    const py = 15;
-    const pw = 190;
-    const ph = 210;
-    
-    ctx.save();
-    // Background card with blur-effect backing
-    ctx.fillStyle = 'rgba(10, 10, 15, 0.85)';
-    ctx.strokeStyle = theme.color;
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.roundRect(px, py, pw, ph, 10);
-    ctx.fill();
-    ctx.stroke();
-    
-    // Title
-    ctx.fillStyle = '#ffffff';
-    ctx.font = "bold 10px 'Share Tech Mono', monospace";
-    ctx.textAlign = 'left';
-    ctx.fillText("JUTSU TUTOR", px + 12, py + 22);
-    
-    // Line separator
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
-    ctx.lineWidth = 1.0;
-    ctx.beginPath();
-    ctx.moveTo(px + 12, py + 28);
-    ctx.lineTo(px + pw - 12, py + 28);
-    ctx.stroke();
-    
-    // Target Name
-    ctx.fillStyle = theme.color;
-    ctx.font = "bold 12px 'Share Tech Mono', monospace";
-    ctx.fillText(targetJutsu.replace('_', ' '), px + 12, py + 45);
-    
-    // Finger list
-    const calibration = getFingerCalibration(handLandmarks, targetJutsu);
-    const fingers = ['thumb', 'index', 'middle', 'ring', 'pinky'];
-    
-    let yOffset = py + 66;
-    fingers.forEach(fKey => {
-        let label = fKey.toUpperCase();
-        let statusText = 'SEARCHING...';
-        let isOk = false;
-        
-        if (calibration) {
-            statusText = calibration[fKey].desc;
-            isOk = calibration[fKey].ok;
-        } else {
-            // Static descriptions when hand not present
-            if (targetJutsu === 'RASENGAN') {
-                if (fKey === 'thumb' || fKey === 'pinky') statusText = 'EXTEND';
-                else statusText = 'CURL';
-            } else if (targetJutsu === 'CHIDORI') {
-                if (fKey === 'index' || fKey === 'pinky') statusText = 'EXTEND';
-                else statusText = 'CURL';
-            } else if (targetJutsu === 'FIREBALL') {
-                statusText = 'EXTEND';
-            } else if (targetJutsu === 'SHADOW_CLONE') {
-                if (fKey === 'index' || fKey === 'middle') statusText = 'EXTEND';
-                else statusText = 'CURL';
-            }
-        }
-        
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
-        ctx.font = "9px 'Share Tech Mono', monospace";
-        ctx.fillText(label + ":", px + 12, yOffset);
-        
-        if (calibration) {
-            ctx.fillStyle = isOk ? '#28dc50' : '#ff3c3c';
-            ctx.font = "bold 9px 'Share Tech Mono', monospace";
-            ctx.fillText(statusText, px + 65, yOffset);
-            
-            // Draw visual indicator (green check or red dot)
-            ctx.beginPath();
-            ctx.arc(px + pw - 18, yOffset - 3, 3.0, 0, Math.PI * 2);
-            ctx.fill();
-        } else {
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.35)';
-            ctx.font = "8px 'Share Tech Mono', monospace";
-            ctx.fillText(statusText, px + 65, yOffset);
-        }
-        
-        yOffset += 15;
-    });
-    
-    // Mini schematic ghost hand centered at the bottom of the card
-    drawGhostHandTemplate(ctx, targetJutsu, px + 70, py + 142, 50, 50);
-    
-    ctx.restore();
-}
 
 // Draw a webcam/model sensor diagnostics card
 function drawDiagnosticsPanel(ctx, handDetected) {
@@ -2705,48 +2477,25 @@ function drawLoop() {
         canvasCtx.globalAlpha = 1.0;
     }
     
-    // Determine active targeted Jutsu for the tutor
-    const targetJutsu = activeComboJutsu !== 'NONE' ? 
-        (JUTSU_COMBOS[activeComboJutsu][activeComboProgress] || trainingTargetJutsu) : 
-        trainingTargetJutsu;
-        
     // Draw Hand Skeletons & Aura sparks (optimized double-stroke glow)
     if (latestResults && latestResults.multiHandLandmarks && latestResults.multiHandLandmarks.length > 0) {
         latestResults.multiHandLandmarks.forEach(handLandmarks => {
-            const calibration = getFingerCalibration(handLandmarks, targetJutsu);
-            
-            // Define bone colors based on finger calibration
-            const thumbColor = (!isTutorEnabled || !calibration) ? theme.color : (calibration.thumb.ok ? '#28dc50' : '#ff3c3c');
-            const indexColor = (!isTutorEnabled || !calibration) ? theme.color : (calibration.index.ok ? '#28dc50' : '#ff3c3c');
-            const middleColor = (!isTutorEnabled || !calibration) ? theme.color : (calibration.middle.ok ? '#28dc50' : '#ff3c3c');
-            const ringColor = (!isTutorEnabled || !calibration) ? theme.color : (calibration.ring.ok ? '#28dc50' : '#ff3c3c');
-            const pinkyColor = (!isTutorEnabled || !calibration) ? theme.color : (calibration.pinky.ok ? '#28dc50' : '#ff3c3c');
-            
             // 1. Draw glowing transparent back path
             canvasCtx.save();
             canvasCtx.lineWidth = 8.5;
             canvasCtx.globalAlpha = 0.35;
             canvasCtx.lineCap = 'round';
             canvasCtx.lineJoin = 'round';
+            canvasCtx.strokeStyle = theme.color;
             
-            canvasCtx.strokeStyle = thumbColor;
             drawSkeletonPath(canvasCtx, handLandmarks, [0, 1, 2, 3, 4]);
-            
-            canvasCtx.strokeStyle = indexColor;
             drawSkeletonPath(canvasCtx, handLandmarks, [0, 5, 6, 7, 8]);
-            
-            canvasCtx.strokeStyle = middleColor;
             drawSkeletonPath(canvasCtx, handLandmarks, [9, 10, 11, 12]);
             drawSkeletonPath(canvasCtx, handLandmarks, [5, 9]);
-            
-            canvasCtx.strokeStyle = ringColor;
             drawSkeletonPath(canvasCtx, handLandmarks, [13, 14, 15, 16]);
             drawSkeletonPath(canvasCtx, handLandmarks, [9, 13]);
-            
-            canvasCtx.strokeStyle = pinkyColor;
             drawSkeletonPath(canvasCtx, handLandmarks, [0, 17, 18, 19, 20]);
             drawSkeletonPath(canvasCtx, handLandmarks, [13, 17]);
-            
             canvasCtx.restore();
             
             // 2. Draw thin solid white core path
@@ -2768,21 +2517,12 @@ function drawLoop() {
             // 3. Draw joint dots
             canvasCtx.save();
             canvasCtx.globalAlpha = 0.95;
+            canvasCtx.fillStyle = theme.color;
             for (let i = 0; i < 21; i++) {
                 const pt = handLandmarks[i];
                 const px = pt.x * canvasElement.width;
                 const py = pt.y * canvasElement.height;
                 
-                let jointColor = theme.color;
-                if (isTutorEnabled && calibration) {
-                    if (i >= 1 && i <= 4) jointColor = calibration.thumb.ok ? '#28dc50' : '#ff3c3c';
-                    else if (i >= 5 && i <= 8) jointColor = calibration.index.ok ? '#28dc50' : '#ff3c3c';
-                    else if (i >= 9 && i <= 12) jointColor = calibration.middle.ok ? '#28dc50' : '#ff3c3c';
-                    else if (i >= 13 && i <= 16) jointColor = calibration.ring.ok ? '#28dc50' : '#ff3c3c';
-                    else if (i >= 17 && i <= 20) jointColor = calibration.pinky.ok ? '#28dc50' : '#ff3c3c';
-                }
-                
-                canvasCtx.fillStyle = jointColor;
                 canvasCtx.beginPath();
                 canvasCtx.arc(px, py, 4.0, 0, Math.PI * 2);
                 canvasCtx.fill();
@@ -2794,147 +2534,9 @@ function drawLoop() {
                 }
             }
             canvasCtx.restore();
-            
-            // Draw interactive Hand Bounding Box & Status Label
-            if (isTutorEnabled && calibration) {
-                // Calculate bounding box in pixels
-                let minX = canvasElement.width, maxX = 0, minY = canvasElement.height, maxY = 0;
-                for (let i = 0; i < 21; i++) {
-                    const px = handLandmarks[i].x * canvasElement.width;
-                    const py = handLandmarks[i].y * canvasElement.height;
-                    if (px < minX) minX = px;
-                    if (px > maxX) maxX = px;
-                    if (py < minY) minY = py;
-                    if (py > maxY) maxY = py;
-                }
-                // Add padding
-                minX = Math.max(0, minX - 25);
-                minY = Math.max(0, minY - 25);
-                maxX = Math.min(canvasElement.width, maxX + 25);
-                maxY = Math.min(canvasElement.height, maxY + 25);
-                
-                const boxWidth = maxX - minX;
-                const boxHeight = maxY - minY;
-                
-                // Determine if all required fingers are OK
-                const allFingersOk = calibration.thumb.ok && calibration.index.ok && calibration.middle.ok && calibration.ring.ok && calibration.pinky.ok;
-                
-                canvasCtx.save();
-                canvasCtx.strokeStyle = allFingersOk ? 'rgba(40, 220, 80, 0.6)' : 'rgba(255, 60, 60, 0.4)';
-                canvasCtx.lineWidth = 2;
-                canvasCtx.strokeRect(minX, minY, boxWidth, boxHeight);
-                
-                // Bounding box corners
-                canvasCtx.strokeStyle = allFingersOk ? '#28dc50' : '#ff3c3c';
-                canvasCtx.lineWidth = 4;
-                const cl = 15; // corner length
-                // Top-left
-                canvasCtx.beginPath(); canvasCtx.moveTo(minX, minY + cl); canvasCtx.lineTo(minX, minY); canvasCtx.lineTo(minX + cl, minY); canvasCtx.stroke();
-                // Top-right
-                canvasCtx.beginPath(); canvasCtx.moveTo(maxX, minY + cl); canvasCtx.lineTo(maxX, minY); canvasCtx.lineTo(maxX - cl, minY); canvasCtx.stroke();
-                // Bottom-left
-                canvasCtx.beginPath(); canvasCtx.moveTo(minX, maxY - cl); canvasCtx.lineTo(minX, maxY); canvasCtx.lineTo(minX + cl, maxY); canvasCtx.stroke();
-                // Bottom-right
-                canvasCtx.beginPath(); canvasCtx.moveTo(maxX, maxY - cl); canvasCtx.lineTo(maxX, maxY); canvasCtx.lineTo(maxX - cl, maxY); canvasCtx.stroke();
-                
-                // Label box
-                canvasCtx.fillStyle = allFingersOk ? 'rgba(40, 220, 80, 0.85)' : 'rgba(255, 60, 60, 0.8)';
-                canvasCtx.beginPath();
-                canvasCtx.roundRect(minX, minY - 24, 115, 20, 4);
-                canvasCtx.fill();
-                
-                canvasCtx.fillStyle = '#000000';
-                canvasCtx.font = "bold 9px 'Share Tech Mono', monospace";
-                canvasCtx.fillText(allFingersOk ? "SEAL CONNECTED" : "SEAL CALIBRATION", minX + 8, minY - 11);
-                canvasCtx.restore();
-            }
         });
     }
-    
-    // Draw pulsing ghost hand silhouette in the center of the canvas if hand is missing
-    if (isTutorEnabled && !handDetected && !isExhausted && targetJutsu !== 'NONE') {
-        const centerX = canvasElement.width / 2;
-        const centerY = canvasElement.height / 2;
-        const size = Math.min(canvasElement.width, canvasElement.height) * 0.45;
-        
-        // Pulsing opacity based on sine wave
-        const pulse = 0.35 + Math.sin(performance.now() * 0.0035) * 0.15;
-        
-        canvasCtx.save();
-        // Text alignment flipped for mirrored view
-        if (isVideoMirrored) {
-            canvasCtx.translate(canvasElement.width, 0);
-            canvasCtx.scale(-1, 1);
-        }
-        
-        // Background banner
-        canvasCtx.fillStyle = 'rgba(10, 10, 15, 0.65)';
-        canvasCtx.beginPath();
-        canvasCtx.roundRect(centerX - 160, centerY - size/2 - 38, 320, 26, 6);
-        canvasCtx.fill();
-        
-        canvasCtx.fillStyle = `rgba(255, 255, 255, ${pulse + 0.15})`;
-        canvasCtx.font = "bold 11px 'Share Tech Mono', monospace";
-        canvasCtx.textAlign = "center";
-        canvasCtx.fillText(`PLACE HAND HERE & FORM ${targetJutsu.replace('_', ' ')} SEAL`, centerX, centerY - size/2 - 21);
-        
-        if (isVideoMirrored) {
-            canvasCtx.translate(canvasElement.width, 0);
-            canvasCtx.scale(-1, 1);
-        }
-        
-        // Draw centered ghost outline
-        canvasCtx.strokeStyle = `rgba(${currentAffinity === 'wind' ? '0, 210, 255' : (currentAffinity === 'lightning' ? '255, 170, 0' : (currentAffinity === 'fire' ? '255, 50, 0' : '153, 51, 255'))}, ${pulse})`;
-        canvasCtx.lineWidth = 2.5;
-        canvasCtx.setLineDash([4, 4]);
-        
-        const getCanvasPt = (pt) => {
-            return {
-                // Adjust for mirror coordinates inside template
-                x: centerX + (isVideoMirrored ? -pt.x : pt.x) * size,
-                y: centerY + (pt.y - 0.05) * size
-            };
-        };
-        
-        const drawTemplatePath = (indices) => {
-            canvasCtx.beginPath();
-            for (let i = 0; i < indices.length; i++) {
-                const pt = getCanvasPt(GESTURE_TEMPLATES[targetJutsu][indices[i]]);
-                if (i === 0) canvasCtx.moveTo(pt.x, pt.y);
-                else canvasCtx.lineTo(pt.x, pt.y);
-            }
-            canvasCtx.stroke();
-        };
-        
-        drawTemplatePath([0, 1, 2, 3, 4]);
-        drawTemplatePath([0, 5, 6, 7, 8]);
-        drawTemplatePath([9, 10, 11, 12]);
-        drawTemplatePath([13, 14, 15, 16]);
-        drawTemplatePath([0, 17, 18, 19, 20]);
-        drawTemplatePath([5, 9, 13, 17]);
-        
-        // Draw joint dots
-        canvasCtx.fillStyle = `rgba(255, 255, 255, ${pulse + 0.1})`;
-        for (let i = 0; i < 21; i++) {
-            const pt = getCanvasPt(GESTURE_TEMPLATES[targetJutsu][i]);
-            canvasCtx.beginPath();
-            canvasCtx.arc(pt.x, pt.y, 3.5, 0, Math.PI * 2);
-            canvasCtx.fill();
-        }
-        
-        canvasCtx.restore();
-    }
-    
-    // Draw live tutor calibration overlay card (supports mirror alignment)
-    if (isTutorEnabled && targetJutsu !== 'NONE') {
-        canvasCtx.save();
-        if (isVideoMirrored) {
-            canvasCtx.translate(canvasElement.width, 0);
-            canvasCtx.scale(-1, 1);
-        }
-        drawTutorHUDPanel(canvasCtx, handLandmarks, targetJutsu, theme);
-        canvasCtx.restore();
-    }
+
     
     // Draw camera & hand tracking diagnostics
     canvasCtx.save();
@@ -3107,7 +2709,7 @@ document.addEventListener('DOMContentLoaded', () => {
     videoElement = document.getElementById('video_input');
     
     // Load 2,900+ Jutsus from the converted json dataset
-    fetch('jutsus.json')
+    fetch('data/jutsus.json')
         .then(response => response.json())
         .then(data => {
             allJutsus = data;
@@ -3299,60 +2901,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Bind Tutor Toggle Button
-    const btnTutor = document.getElementById('btn-tutor');
-    if (btnTutor) {
-        btnTutor.style.cursor = 'pointer';
-        btnTutor.addEventListener('click', () => {
-            isTutorEnabled = !isTutorEnabled;
-            addLogEntry(`Jutsu Tutor mode set to: ${isTutorEnabled ? 'ON' : 'OFF'}`);
-            
-            if (isTutorEnabled) {
-                btnTutor.classList.add('active-tutor');
-                btnTutor.innerHTML = `
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-                    JUTSU TUTOR (ON)
-                `;
-            } else {
-                btnTutor.classList.remove('active-tutor');
-                btnTutor.innerHTML = `
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-                    JUTSU TUTOR (OFF)
-                `;
-            }
-        });
-    }
-
-    // Bind Cast Mode Toggle Button
-    const btnCastMode = document.getElementById('btn-cast-mode');
-    if (btnCastMode) {
-        btnCastMode.style.cursor = 'pointer';
-        btnCastMode.addEventListener('click', () => {
-            castMode = castMode === 'combo' ? 'instant' : 'combo';
-            addLogEntry(`Chakra spell cast mode set to: ${castMode.toUpperCase()}`);
-            
-            if (castMode === 'instant') {
-                btnCastMode.innerHTML = `
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-                    CAST: INSTANT (EASY)
-                `;
-                btnCastMode.style.borderColor = '#28dc50';
-                btnCastMode.style.color = '#28dc50';
-                btnCastMode.style.background = 'rgba(40, 220, 80, 0.1)';
-            } else {
-                btnCastMode.innerHTML = `
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-                    CAST: COMBO (PRO)
-                `;
-                btnCastMode.style.borderColor = 'var(--border-color)';
-                btnCastMode.style.color = 'var(--text-primary)';
-                btnCastMode.style.background = 'rgba(15, 15, 20, 0.85)';
-            }
-            
-            // Reset any active combo
-            resetCombo();
-        });
-    }
     
     // Bind Scroll Cards (Allow user to select training target Jutsu)
     document.querySelectorAll('.scroll-card').forEach(card => {
