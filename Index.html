@@ -1,358 +1,1570 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Naruto Jutsu Dojo - Shinobi Training</title>
-    <!-- MediaPipe CDNs -->
+    <title>Shinobi Dojo - Interactive AI Hand Seals</title>
+    <!-- MediaPipe Libraries -->
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_detection/face_detection.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
-    <!-- Custom Style Sheet -->
-    <link rel="stylesheet" href="css/style.css">
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Share+Tech+Mono&family=Shojumaru&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-base: #060609;
+            --panel-bg: rgba(12, 12, 20, 0.85);
+            --border-color: rgba(255, 255, 255, 0.08);
+            --text-primary: #ffffff;
+            --text-secondary: rgba(255, 255, 255, 0.6);
+            
+            /* Jutsu Element Themes */
+            --color-wind: #ffaa00;
+            --glow-wind: rgba(255, 170, 0, 0.35);
+            --color-lightning: #00d2ff;
+            --glow-lightning: rgba(0, 210, 255, 0.35);
+            --color-fire: #ff3333;
+            --glow-fire: rgba(255, 51, 51, 0.35);
+            --color-shadow: #b500ff;
+            --glow-shadow: rgba(181, 0, 255, 0.35);
+            --color-water: #0088ff;
+            --glow-water: rgba(0, 136, 255, 0.35);
+            --color-earth: #c8963e;
+            --glow-earth: rgba(200, 150, 62, 0.35);
+            
+            --active-chakra: var(--color-wind);
+            --active-glow: var(--glow-wind);
+        }
+
+        body {
+            margin: 0;
+            background-color: var(--bg-base);
+            color: var(--text-primary);
+            font-family: 'Outfit', sans-serif;
+            overflow-x: hidden;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Ambient background glow */
+        body::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: 
+                radial-gradient(circle at 10% 20%, rgba(255, 170, 0, 0.03) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(0, 210, 255, 0.03) 0%, transparent 40%),
+                radial-gradient(circle at 50% 50%, rgba(181, 0, 255, 0.02) 0%, transparent 50%);
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px 28px;
+            background: rgba(6, 6, 9, 0.9);
+            border-bottom: 1.5px solid var(--border-color);
+            z-index: 100;
+            backdrop-filter: blur(8px);
+        }
+
+        .logo-section h1 {
+            margin: 0;
+            font-family: 'Shojumaru', cursive;
+            font-size: 1.6rem;
+            letter-spacing: 2px;
+            background: linear-gradient(45deg, #ffaa00, #ff5500, #00d2ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 30px rgba(255, 170, 0, 0.25);
+        }
+
+        .logo-section p {
+            margin: 2px 0 0 0;
+            font-size: 0.72rem;
+            font-family: 'Share Tech Mono', monospace;
+            letter-spacing: 2.5px;
+            color: var(--text-secondary);
+        }
+
+        .header-controls {
+            display: flex;
+            gap: 12px;
+        }
+
+        /* Button Styling */
+        .btn-action {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.8rem;
+            letter-spacing: 1px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-action:hover {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 255, 255, 0.25);
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.05);
+        }
+
+        .btn-action.active {
+            background: rgba(0, 210, 255, 0.1);
+            border-color: var(--color-lightning);
+            color: var(--color-lightning);
+            box-shadow: 0 0 12px var(--glow-lightning);
+        }
+
+        /* Main app grid layout */
+        .app-container {
+            display: grid;
+            grid-template-columns: 320px 1fr 340px;
+            flex: 1;
+            overflow: hidden;
+            height: calc(100vh - 66px);
+        }
+
+        /* Sidebar Panels */
+        .panel {
+            background: var(--panel-bg);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            backdrop-filter: blur(16px);
+            z-index: 10;
+        }
+
+        .panel-right {
+            border-right: none;
+            border-left: 1px solid var(--border-color);
+        }
+
+        .panel-header {
+            padding: 18px 24px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .panel-header h2 {
+            margin: 0;
+            font-size: 1rem;
+            font-weight: 600;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            color: var(--text-primary);
+            font-family: 'Share Tech Mono', monospace;
+        }
+
+        .panel-content {
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .section-title {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.75rem;
+            letter-spacing: 2px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            margin-bottom: 8px;
+            border-left: 2px solid var(--active-chakra);
+            padding-left: 8px;
+            transition: border-color 0.3s;
+        }
+
+        /* Dojo Workspace */
+        .dojo-workspace {
+            position: relative;
+            background-color: #020204;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            flex: 1;
+        }
+
+        #output_canvas {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        /* HUD elements overlays */
+        #status-overlay {
+            position: absolute;
+            top: 25px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(2, 2, 4, 0.85);
+            border: 1px solid var(--active-chakra);
+            box-shadow: 0 0 15px var(--active-glow);
+            padding: 10px 24px;
+            border-radius: 20px;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 1rem;
+            font-weight: bold;
+            letter-spacing: 3px;
+            color: var(--text-primary);
+            text-transform: uppercase;
+            z-index: 50;
+            pointer-events: none;
+            transition: all 0.3s;
+        }
+
+        #status-overlay.jutsu-active {
+            animation: pulse-border 1.5s infinite alternate;
+        }
+
+        @keyframes pulse-border {
+            0% { border-color: var(--active-chakra); box-shadow: 0 0 8px var(--active-glow); }
+            100% { border-color: #ffffff; box-shadow: 0 0 20px var(--active-glow), 0 0 5px #fff; }
+        }
+
+        .hud-corner {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(255, 255, 255, 0.15);
+            pointer-events: none;
+            z-index: 40;
+        }
+
+        .corner-tl { top: 20px; left: 20px; border-right: none; border-bottom: none; }
+        .corner-tr { top: 20px; right: 20px; border-left: none; border-bottom: none; }
+        .corner-bl { bottom: 20px; left: 20px; border-right: none; border-top: none; }
+        .corner-br { bottom: 20px; right: 20px; border-left: none; border-top: none; }
+
+        /* Sound Indicator Dot */
+        .sound-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #ff3c3c;
+            display: inline-block;
+        }
+        .sound-dot.active {
+            background: #00d2ff;
+            box-shadow: 0 0 8px #00d2ff;
+        }
+
+        /* Card Elements */
+        .card {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 16px;
+            transition: all 0.3s ease;
+        }
+
+        .card:hover {
+            border-color: rgba(255, 255, 255, 0.15);
+            background: rgba(255, 255, 255, 0.04);
+        }
+
+        /* Chakra Gauge */
+        .chakra-gauge-container {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .chakra-bar {
+            width: 100%;
+            height: 14px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border-color);
+            border-radius: 7px;
+            overflow: hidden;
+            position: relative;
+        }
+        .chakra-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--active-chakra), #ffffff);
+            box-shadow: 0 0 10px var(--active-glow);
+            width: 100%;
+            transition: width 0.3s ease, background 0.5s;
+        }
+
+        /* Jutsu List Cards */
+        .jutsu-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .jutsu-card {
+            cursor: pointer;
+            border-left: 3px solid transparent;
+        }
+
+        .jutsu-card.wind { border-left-color: var(--color-wind); }
+        .jutsu-card.lightning { border-left-color: var(--color-lightning); }
+        .jutsu-card.fire { border-left-color: var(--color-fire); }
+        .jutsu-card.shadow { border-left-color: var(--color-shadow); }
+        .jutsu-card.water { border-left-color: var(--color-water); }
+        .jutsu-card.earth { border-left-color: var(--color-earth); }
+
+        .jutsu-card.active {
+            background: rgba(255, 255, 255, 0.06);
+            border-color: #ffffff;
+            box-shadow: 0 0 15px var(--active-glow);
+        }
+
+        .jutsu-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+
+        .jutsu-title {
+            font-weight: 600;
+            font-size: 0.95rem;
+            letter-spacing: 0.5px;
+        }
+
+        .jutsu-badge {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.68rem;
+            padding: 2px 6px;
+            border-radius: 4px;
+            text-transform: uppercase;
+        }
+
+        .jutsu-badge.wind { background: rgba(255, 170, 0, 0.15); color: var(--color-wind); }
+        .jutsu-badge.lightning { background: rgba(0, 210, 255, 0.15); color: var(--color-lightning); }
+        .jutsu-badge.fire { background: rgba(255, 51, 51, 0.15); color: var(--color-fire); }
+        .jutsu-badge.shadow { background: rgba(181, 0, 255, 0.15); color: var(--color-shadow); }
+        .jutsu-badge.water { background: rgba(0, 136, 255, 0.15); color: var(--color-water); }
+        .jutsu-badge.earth { background: rgba(200, 150, 62, 0.15); color: var(--color-earth); }
+
+        .jutsu-sign-requirement {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.72rem;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+
+        /* Logger Console */
+        .console-logs {
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.75rem;
+            padding: 12px;
+            height: 140px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            scroll-behavior: smooth;
+        }
+
+        .log-entry {
+            line-height: 1.4;
+            color: rgba(255, 255, 255, 0.7);
+        }
+        .log-entry.active-log {
+            color: #00e676;
+        }
+        .log-entry.warn-log {
+            color: #ff3c3c;
+        }
+
+        /* Transition Screen Flash effect */
+        .flash-screen {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: white;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 60;
+        }
+
+        .element-glow {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            box-shadow: inset 0 0 0px transparent;
+            pointer-events: none;
+            z-index: 55;
+            transition: box-shadow 0.3s;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+    </style>
 </head>
 <body>
-    <!-- Scrollable Loading / Intro Screen -->
-    <div id="intro-screen">
-        <div class="intro-content-wrapper">
-            <div class="intro-logo-container">
-                <svg class="konoha-swirl" viewBox="0 0 100 100">
-                    <path d="M 50 15 C 30 15 15 30 15 50 C 15 70 30 85 50 85 C 70 85 85 70 85 50 C 85 30 70 15 50 15 M 50 25 C 65 25 75 35 75 50 C 75 60 68 70 55 74 C 48 76 40 73 38 66 C 36 60 41 53 48 53 C 53 53 58 50 58 45 C 58 40 50 38 42 42 C 34 46 32 55 35 62" />
-                </svg>
-            </div>
-            
-            <div class="intro-header">
-                <h1 class="intro-title">SHINOBI DOJO</h1>
-                <p class="intro-subtitle">Interactive AI Hand Recognition</p>
-            </div>
-            
-            <!-- Scroll indicator -->
-            <div class="scroll-indicator">
-                <span>SCROLL DOWN FOR REGISTRATION</span>
-                <svg viewBox="0 0 24 24"><path d="M7 10l5 5 5-5"/></svg>
-            </div>
-            
-            <!-- Section 1: Lore / Affinity Guide -->
-            <section class="intro-section">
-                <h2>Choose Your Nature Element</h2>
-                <p>A shinobi's chakra nature defines their affinity for Jutsus. In this Dojo, your nature is locked upon registration. You can only perform the secret art of your chosen element.</p>
-                
-                <div class="lore-grid">
-                    <div class="lore-card wind">
-                        <div class="lore-card-header">
-                            <span class="lore-card-title">WIND AFFINITY</span>
-                            <span style="font-family:'Shojumaru'; color:var(--chakra-wind)">風</span>
-                        </div>
-                        <p class="lore-card-desc">Unlocks the <strong>Rasengan</strong>. Condense wind chakra by forming a <strong>🤙 Shaka Sign</strong> (extend your Thumb & Pinky, curl other fingers).</p>
-                    </div>
-                    
-                    <div class="lore-card lightning">
-                        <div class="lore-card-header">
-                            <span class="lore-card-title">LIGHTNING AFFINITY</span>
-                            <span style="font-family:'Shojumaru'; color:var(--chakra-lightning)">雷</span>
-                        </div>
-                        <p class="lore-card-desc">Unlocks the <strong>Chidori</strong>. Gather electricity by forming a <strong>🤘 Rock-on Sign</strong> (extend your Index & Pinky, curl middle/ring fingers).</p>
-                    </div>
-                    
-                    <div class="lore-card fire">
-                        <div class="lore-card-header">
-                            <span class="lore-card-title">FIRE AFFINITY</span>
-                            <span style="font-family:'Shojumaru'; color:var(--chakra-fire)">火</span>
-                        </div>
-                        <p class="lore-card-desc">Unlocks the <strong>Fireball Jutsu</strong>. Expel flames by holding a <strong>🖐️ Open Flat Palm</strong> facing the camera.</p>
-                    </div>
-                    
-                    <div class="lore-card shadow">
-                        <div class="lore-card-header">
-                            <span class="lore-card-title">SHADOW AFFINITY</span>
-                            <span style="font-family:'Shojumaru'; color:var(--chakra-shadow)">影</span>
-                        </div>
-                        <p class="lore-card-desc">Unlocks the <strong>Shadow Clone Jutsu</strong>. Form clones using the Confrontation seal: make a <strong>✌️ Peace Sign</strong> (extend Index & Middle fingers).</p>
-                    </div>
-                </div>
-            </section>
-            
-            <!-- Section 2: Instructions and Training Rules -->
-            <section class="intro-section">
-                <h2>Rules of the Dojo</h2>
-                <p>Follow these instructions to complete your training and rank up:</p>
-                <ul style="color:var(--text-secondary); text-align:left; font-size:0.95rem; line-height:1.6; display:flex; flex-direction:column; gap:12px; max-width:600px; margin:0 auto; padding-left:20px;">
-                    <li><strong>Locked Affinity:</strong> Once you register, you cannot change your nature type during the training session. Make your choice wisely.</li>
-                    <li><strong>Jutsu Sustainment:</strong> Form and hold the required hand sign for a moment. Once invoked, the Jutsu is locked active! You can release the sign, move your hands, and run around while the Jutsu remains active, just like in the anime.</li>
-                    <li><strong>Chakra Exhaustion:</strong> Casting Jutsus consumes your chakra. If your chakra drops to 0%, you enter a state of exhaustion.</li>
-                    <li><strong>Gather Sparks Mini-game:</strong> To recover your chakra, you must touch the glowing chakra spark targets that appear on the screen using your hand. Collecting all sparks restores your chakra.</li>
-                    <li><strong>Ninja Ranks & Infinite Use:</strong> Earn XP by casting Jutsus and gathering chakra. Rank up from Academy Student, Genin, Chunin, to Jonin. Reaching the legendary rank of <strong>Kage</strong> grants you infinite chakra with 0% cost!</li>
-                </ul>
-            </section>
-            
-            <!-- Section 3: Registration / Login Form -->
-            <section class="intro-section">
-                <h2>Shinobi Entrance</h2>
-                <div class="registration-tabs" style="display:flex; justify-content:center; gap:20px; margin-bottom:25px; border-bottom:1px solid var(--border-color); padding-bottom:12px;">
-                    <button id="tab-new-shinobi" class="tab-btn active" style="background:none; border:none; color:var(--active-chakra); font-family:'Share Tech Mono', monospace; font-size:1rem; font-weight:bold; cursor:pointer; padding:5px 15px; border-bottom:2px solid var(--active-chakra); transition:all 0.3s;">NEW SHINOBI</button>
-                    <button id="tab-load-scroll" class="tab-btn" style="background:none; border:none; color:var(--text-secondary); font-family:'Share Tech Mono', monospace; font-size:1rem; font-weight:bold; cursor:pointer; padding:5px 15px; border-bottom:2px solid transparent; transition:all 0.3s;">LOAD SCROLL</button>
-                </div>
-                
-                <!-- Tab Content: New Shinobi -->
-                <div id="content-new-shinobi" class="tab-content" style="display:block;">
-                    <div class="registration-form">
-                        <div class="form-group">
-                            <label for="shinobi-name">Shinobi Name</label>
-                            <input type="text" id="shinobi-name" class="form-input" placeholder="Enter your name..." value="Naruto">
-                        </div>
-                        
-                        <div class="form-group">
-                            <label>Select Nature Element (LOCKED ON REGISTRATION)</label>
-                            <div class="chakra-selector-grid">
-                                <button class="chakra-btn-select selected" data-affinity="wind">
-                                    <div class="dot"></div>
-                                    <span>WIND NATURE</span>
-                                </button>
-                                <button class="chakra-btn-select" data-affinity="lightning">
-                                    <div class="dot"></div>
-                                    <span>LIGHTNING NATURE</span>
-                                </button>
-                                <button class="chakra-btn-select" data-affinity="fire">
-                                    <div class="dot"></div>
-                                    <span>FIRE NATURE</span>
-                                </button>
-                                <button class="chakra-btn-select" data-affinity="shadow">
-                                    <div class="dot"></div>
-                                    <span>SHADOW NATURE</span>
-                                </button>
-                            </div>
-                        </div>
-                        
-                        <button id="btn-start-dojo" class="btn-enter-dojo">Register & Enter Dojo</button>
-                    </div>
-                </div>
-                
-                <!-- Tab Content: Load Scroll -->
-                <div id="content-load-scroll" class="tab-content" style="display:none; text-align:center;">
-                    <div id="saved-profile-box" style="background: rgba(255,255,255,0.03); border:1px solid var(--border-color); border-radius:12px; padding:20px; max-width:400px; margin:0 auto 20px auto; display:none; flex-direction:column; gap:6px;">
-                        <div style="font-family:'Share Tech Mono', monospace; font-size:1.4rem; font-weight:bold; color:var(--active-chakra); text-transform:uppercase;" id="saved-profile-name">NARUTO</div>
-                        <div style="font-size:0.8rem; color:var(--text-secondary); text-transform:uppercase; font-weight:bold; letter-spacing:2px;" id="saved-profile-nature">WIND NATURE</div>
-                        <div style="display:flex; justify-content:space-around; margin-top:15px; font-family:'Share Tech Mono', monospace; font-size:0.9rem; border-top:1px solid var(--border-color); padding-top:12px;">
-                            <div>RANK: <span id="saved-profile-rank" style="color:#ffaa00; font-weight:bold;">GENIN</span></div>
-                            <div>XP: <span id="saved-profile-xp" style="color:#00d2ff; font-weight:bold;">0/50</span></div>
-                        </div>
-                    </div>
-                    <div id="no-saved-profile-msg" style="color:var(--text-secondary); font-family:'Share Tech Mono', monospace; padding:30px 0;">
-                        No saved shinobi scroll found. Register a new character to start training!
-                    </div>
-                    <button id="btn-load-dojo" class="btn-enter-dojo" style="display:none; max-width:400px; margin:0 auto;">Unseal Scroll & Enter Dojo</button>
-                </div>
-            </section>
-        </div>
-    </div>
+    <div id="flash-screen" class="flash-screen"></div>
+    <div id="element-glow" class="element-glow"></div>
 
-    <!-- Main Workspace -->
+    <header>
+        <div class="logo-section">
+            <h1>SHINOBI DOJO</h1>
+            <p>WEB GL HAND TRACKING HARNESS</p>
+        </div>
+        <div class="header-controls">
+            <button id="btn-sound" class="btn-action active">
+                <span id="sound-dot" class="sound-dot active"></span>
+                SOUND SYNTH (ON)
+            </button>
+            <button id="btn-mirror" class="btn-action">
+                FLIP CAMERA
+            </button>
+        </div>
+    </header>
+
     <div class="app-container">
-        
-        <!-- LEFT PANEL: LOCKED JUTSUS & LIBRARY -->
+        <!-- LEFT PANEL: STATS & LOGS -->
         <aside class="panel">
             <div class="panel-header">
-                <h2>Scroll of Jutsus</h2>
+                <h2>CHAKRA MATRIX</h2>
             </div>
-            
             <div class="panel-content">
-                <div class="section-title">SHINOBI REGISTRY</div>
-                <div style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; text-align: center;">
-                    <div id="locked-name-badge" style="font-family: 'Share Tech Mono', monospace; font-size: 1.1rem; font-weight: bold; color: var(--active-chakra); letter-spacing: 1px;">NARUTO</div>
-                    <div id="locked-nature-badge" style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; margin-top: 4px; font-weight: bold; letter-spacing: 2px;">WIND NATURE (LOCKED)</div>
-                </div>
-                
-                <div class="section-title">AVAILABLE SECRETS</div>
-                
-                <!-- Wind Jutsu -->
-                <div class="scroll-card" id="card-wind" data-jutsu="RASENGAN">
-                    <div class="scroll-card-header">
-                        <span class="scroll-card-title">Rasengan 🤙</span>
-                        <span class="scroll-card-kanji">螺旋丸</span>
+                <div class="chakra-gauge-container">
+                    <div class="section-title">CHAKRA CAPACITY</div>
+                    <div class="chakra-bar">
+                        <div id="chakra-fill" class="chakra-fill"></div>
                     </div>
-                    <p class="scroll-card-desc">Condenses spiraling chakra in the palm. Forms a swirling, glowing wind vortex.</p>
-                    <span class="scroll-card-seal">Seal: Shaka Sign (Thumb & Pinky extended)</span>
-                </div>
-                
-                <!-- Lightning Jutsu -->
-                <div class="scroll-card locked" id="card-lightning" data-jutsu="CHIDORI">
-                    <div class="scroll-card-header">
-                        <span class="scroll-card-title">Chidori 🤘</span>
-                        <span class="scroll-card-kanji">千鳥</span>
+                    <div style="display:flex; justify-content:space-between; font-size:0.7rem; font-family:'Share Tech Mono', monospace; color:var(--text-secondary);">
+                        <span>RESERVES</span>
+                        <span id="chakra-pct">100%</span>
                     </div>
-                    <p class="scroll-card-desc">Charges lightning chakra around the hand. Triggers electrical bolts and sparks.</p>
-                    <span class="scroll-card-seal">Seal: Rock Sign (Index & Pinky extended)</span>
                 </div>
 
-                <!-- Fire Jutsu -->
-                <div class="scroll-card locked" id="card-fire" data-jutsu="FIREBALL">
-                    <div class="scroll-card-header">
-                        <span class="scroll-card-title">Fireball Jutsu 🖐️</span>
-                        <span class="scroll-card-kanji">豪火球</span>
+                <div class="profile-card card">
+                    <div class="section-title" style="margin-left:0; border:none; padding:0;">SHINOBI RANKS</div>
+                    <div style="display:flex; justify-content:space-between; font-size:0.8rem; margin-top:8px;">
+                        <span>Rank:</span>
+                        <span id="shinobi-rank" style="color:var(--color-wind); font-weight:bold; font-family:'Share Tech Mono', monospace;">GENIN</span>
                     </div>
-                    <p class="scroll-card-desc">Expels intense fire stream. Triggers flame particles and heat glows on screen.</p>
-                    <span class="scroll-card-seal">Seal: Open Palm (All fingers extended)</span>
+                    <div style="display:flex; justify-content:space-between; font-size:0.8rem; margin-top:4px;">
+                        <span>XP:</span>
+                        <span id="shinobi-xp" style="font-family:'Share Tech Mono', monospace;">0 / 100</span>
+                    </div>
                 </div>
 
-                <!-- Shadow Jutsu -->
-                <div class="scroll-card locked" id="card-shadow" data-jutsu="SHADOW_CLONE">
-                    <div class="scroll-card-header">
-                        <span class="scroll-card-title">Shadow Clone ✌️</span>
-                        <span class="scroll-card-kanji">影分身</span>
-                    </div>
-                    <p class="scroll-card-desc">Splits user's chakra into duplicates. Triggers a flash of clones on the sides.</p>
-                    <span class="scroll-card-seal">Seal: Peace Sign (Index & Middle extended)</span>
-                </div>
-
-                <!-- Shinobi Library Search Section -->
-                <div class="section-title">SHINOBI LIBRARY</div>
-                <div style="display:flex; flex-direction:column; gap:10px;">
-                    <input type="text" id="lib-search" class="form-input" placeholder="Search 2,900+ Jutsus..." style="padding: 10px 14px; font-size: 0.85rem;">
-                    
-                    <!-- Search Results -->
-                    <div id="lib-results" style="max-height: 180px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;"></div>
-                    
-                    <!-- Detail View -->
-                    <div id="lib-details" style="display: none; background: rgba(0,0,0,0.35); border: 1px solid var(--border-color); border-radius: 8px; padding: 14px; font-size: 0.8rem; line-height: 1.45; max-height: 320px; overflow-y: auto;">
-                        <div id="lib-details-name" style="font-weight: bold; color: var(--active-chakra); font-family: 'Share Tech Mono', monospace; font-size: 0.95rem; margin-bottom: 2px;"></div>
-                        <div id="lib-details-type" style="font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; font-weight: bold; letter-spacing: 1px; margin-bottom: 8px;"></div>
-                        <div id="lib-details-desc" style="color: var(--text-primary);"></div>
-                        <div id="lib-details-seals" style="color: #ffcc00; font-family: 'Share Tech Mono', monospace; font-size: 0.75rem; margin-top: 10px; margin-bottom: 10px; font-weight: bold; display: none; padding: 6px; background: rgba(255, 204, 0, 0.05); border: 1px dashed rgba(255, 204, 0, 0.2); border-radius: 4px;"></div>
-                        <button id="btn-equip-jutsu" style="width: 100%; display: none; padding: 8px 12px; font-size: 0.75rem; margin-top: 10px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: var(--text-primary); font-family: 'Share Tech Mono', monospace; font-weight: bold; border-radius: 6px; cursor: pointer; transition: all 0.2s; letter-spacing: 1.5px; text-transform: uppercase; outline: none;"></button>
+                <div>
+                    <div class="section-title">JUTSU METRICS LOG</div>
+                    <div id="console-logs" class="console-logs">
+                        <div class="log-entry">Dojo sensors online. Waiting for hand tracking...</div>
                     </div>
                 </div>
             </div>
         </aside>
 
-        <!-- CENTER AREA: DOJO CAMERA -->
-        <main class="dojo-center">
-            <header class="dojo-header">
-                <div class="dojo-logo">SHINOBI DOJO</div>
-                <div class="dojo-hud-stats">
-                    <div class="hud-stat-box">
-                        <span>VELOCITY:</span>
-                        <span id="speed-val" class="val">0</span>
-                    </div>
-                    <div class="hud-stat-box">
-                        <span>CHAKRA:</span>
-                        <span id="level-val" class="val">100</span><span>%</span>
-                    </div>
-                </div>
-            </header>
-
-            <div class="canvas-workspace">
-                <!-- Video feed -->
-                <video id="video_input" style="display:none;" playsinline></video>
-                
-                <!-- Main output canvas -->
-                <canvas id="output_canvas"></canvas>
-                
-                <!-- Overlay HUD display -->
-                <div id="status-overlay">INITIALIZING SENSORS...</div>
-                
-                
-                <!-- Seals Combo HUD -->
-                <div id="combo-hud" class="combo-hud-container">
-                    <span class="combo-label-prefix">SEALS COMBO:</span>
-                    <div id="combo-steps"></div>
-                </div>
-                
-                
-                <!-- Canvas Control buttons -->
-                <div class="canvas-controls">
-                    <button id="btn-capture" class="btn-ctrl">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
-                        SEAL SCROLL (SNAP)
-                    </button>
-                    <button id="btn-mirror" class="btn-ctrl">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 12a8 8 0 1 0-8 8"/><path d="M22 20h-6v-6"/><path d="M20 16l-4 4"/></svg>
-                        FLIP CAMERA
-                    </button>
-                </div>
-                
-                <!-- Exhaustion & Mini-game Screen Overlay -->
-                <div id="exhaustion-overlay">
-                    <div class="exhaustion-title">CHAKRA EXHAUSTED</div>
-                    <div class="exhaustion-desc">Your chakra reserves have been completely depleted! Gather the glowing chakra sparks on the screen to restore your energy.</div>
-                    <div class="game-progress-text">Sparks gathered: <span id="gathered-sparks-count">0</span> / 5</div>
-                </div>
-                
-                <!-- Transition screens -->
-                <div id="flash-screen" class="flash-screen"></div>
-                <div id="fire-glow" class="fire-glow"></div>
-                <div id="lightning-flash" class="lightning-flash"></div>
-            </div>
+        <!-- CENTER PANEL: DOJO WORKSPACE -->
+        <main class="dojo-workspace">
+            <div class="hud-corner corner-tl"></div>
+            <div class="hud-corner corner-tr"></div>
+            <div class="hud-corner corner-bl"></div>
+            <div class="hud-corner corner-br"></div>
+            
+            <div id="status-overlay">FORM THE TARGET SEAL</div>
+            
+            <video id="video_input" style="display:none;" playsinline></video>
+            <canvas id="output_canvas"></canvas>
         </main>
 
-        <!-- RIGHT PANEL: SHINOBI STATS -->
+        <!-- RIGHT PANEL: JUTSU LIBRARY -->
         <aside class="panel panel-right">
             <div class="panel-header">
-                <h2>Chakra Matrix</h2>
+                <h2>JUTSU LIBRARY</h2>
             </div>
-            
             <div class="panel-content">
-                <div class="section-title">SHINOBI PROFILE</div>
-                <div style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: 8px; padding: 16px;">
-                    <div style="display:flex; justify-content:space-between; align-items:center;">
-                        <span style="font-family:'Share Tech Mono', monospace; font-size:0.75rem; color:var(--text-secondary);">NINJA RANK:</span>
-                        <span id="rank-badge" style="font-weight:bold; font-size:0.9rem; color:#ffaa00; text-shadow:0 0 6px rgba(255,170,0,0.3);">ACADEMY STUDENT</span>
+                <div class="section-title">Equipped Jutsus</div>
+                
+                <div class="jutsu-list">
+                    <div class="card jutsu-card shadow active" data-jutsu="SHADOW_CLONE">
+                        <div class="jutsu-header">
+                            <span class="jutsu-title">Shadow Clone</span>
+                            <span class="jutsu-badge shadow">Shadow</span>
+                        </div>
+                        <div class="jutsu-sign-requirement">Seal: Cross Seal (Two Hands touching index tips)</div>
                     </div>
-                    
-                    <div class="xp-container" style="margin-top: 12px;">
-                        <div style="display:flex; justify-content:space-between; font-size:0.75rem; font-family:'Share Tech Mono', monospace;">
-                            <span>NINJA EXPERIENCE (XP)</span>
-                            <span id="xp-val" style="color:#00d2ff; font-weight:bold;">0 / 50</span>
+
+                    <div class="card jutsu-card fire" data-jutsu="FIREBALL">
+                        <div class="jutsu-header">
+                            <span class="jutsu-title">Great Fireball</span>
+                            <span class="jutsu-badge fire">Fire</span>
                         </div>
-                        <div class="xp-bar-outer">
-                            <div id="xp-bar-fill" class="xp-bar-inner"></div>
+                        <div class="jutsu-sign-requirement">Seal: Fire Release (Flat hand, fingers extended)</div>
+                    </div>
+
+                    <div class="card jutsu-card wind" data-jutsu="RASENGAN">
+                        <div class="jutsu-header">
+                            <span class="jutsu-title">Rasengan</span>
+                            <span class="jutsu-badge wind">Wind</span>
                         </div>
+                        <div class="jutsu-sign-requirement">Seal: Wind Release (Thumb & pinky extended, others curled)</div>
+                    </div>
+
+                    <div class="card jutsu-card lightning" data-jutsu="CHIDORI">
+                        <div class="jutsu-header">
+                            <span class="jutsu-title">Chidori</span>
+                            <span class="jutsu-badge lightning">Lightning</span>
+                        </div>
+                        <div class="jutsu-sign-requirement">Seal: Lightning Release (Index & Pinky extended, middle/ring curled)</div>
+                    </div>
+
+                    <div class="card jutsu-card water" data-jutsu="WATER_DRAGON">
+                        <div class="jutsu-header">
+                            <span class="jutsu-title">Water Dragon</span>
+                            <span class="jutsu-badge water">Water</span>
+                        </div>
+                        <div class="jutsu-sign-requirement">Seal: Water Release (Index curled under thumb, others extended)</div>
+                    </div>
+
+                    <div class="card jutsu-card earth" data-jutsu="EARTH_WALL">
+                        <div class="jutsu-header">
+                            <span class="jutsu-title">Earth Wall</span>
+                            <span class="jutsu-badge earth">Earth</span>
+                        </div>
+                        <div class="jutsu-sign-requirement">Seal: Earth Release / Confrontation (Index & Middle extended, others curled)</div>
                     </div>
                 </div>
 
-                <div class="section-title">CHAKRA CAPACITY</div>
-                <div class="metric-box">
-                    <div style="display:flex; justify-content:space-between; font-size:0.85rem; font-family:'Share Tech Mono', monospace;">
-                        <span>RESERVES</span>
-                        <span id="cost-badge" style="color:#ff3333; font-weight:bold; font-size:0.8rem;">Cost: 35% / cast</span>
-                    </div>
-                    <div id="chakra-meter-box" class="chakra-meter-container">
-                        <div class="chakra-meter-fill"></div>
-                    </div>
-                    <div id="supercharged-notice" style="font-size:0.75rem; color:var(--text-secondary); line-height:1.4;">
-                        Move your hands rapidly to build velocity. At Kage rank, you unlock infinite chakra!
-                    </div>
-                </div>
-                
-                <div class="section-title">ACTIVE JUTSU</div>
-                <div class="stats-grid">
-                    <div class="stat-item" style="grid-column: span 2;">
-                        <div class="stat-label">FORMULA SPELL</div>
-                        <div id="active-jutsu-val" class="stat-val" style="color:var(--active-chakra); transition:color 0.2s;">NONE</div>
-                    </div>
-                </div>
-                
-                <div class="section-title">JUTSU METRICS LOG</div>
-                <div id="log-console" class="log-console">
-                    <div class="log-entry">Dojo console online. Waiting for hand tracking...</div>
-                </div>
-                
-                <div class="section-title">SCROLLS GALLERY (SNAPSHOTS)</div>
-                <div id="gallery-grid" class="gallery-grid">
-                    <div class="gallery-empty">No snaps captured yet. Click "Seal Scroll" to snap a clone moment!</div>
+                <div class="card" style="font-size:0.75rem; line-height:1.5; color:var(--text-secondary);">
+                    <div class="section-title" style="margin-left:0; border:none; padding:0;">INSTRUCTIONS</div>
+                    Select a target Jutsu scroll in the library. Then, form the required hand seal in front of your webcam to unleash the chakra!
                 </div>
             </div>
         </aside>
+    </div>
+
+    <!-- Core App Logic -->
+    <script>
+        const videoElement = document.getElementById('video_input');
+        const canvasElement = document.getElementById('output_canvas');
+        const canvasCtx = canvasElement.getContext('2d');
+        const statusOverlay = document.getElementById('status-overlay');
+        const flashScreen = document.getElementById('flash-screen');
+        const elementGlow = document.getElementById('element-glow');
         
-    </div>
+        const chakraFill = document.getElementById('chakra-fill');
+        const chakraPct = document.getElementById('chakra-pct');
+        const shinobiXP = document.getElementById('shinobi-xp');
+        const consoleLogs = document.getElementById('console-logs');
 
-    <!-- Virtual Cursor for Air Gestures/Dwell Clicker -->
-    <div id="virtual-cursor" style="position: fixed; width: 26px; height: 26px; border: 2.5px solid var(--active-chakra); border-radius: 50%; pointer-events: none; z-index: 10000; transform: translate(-50%, -50%); display: none; box-shadow: 0 0 10px var(--active-glow); background: rgba(255, 255, 255, 0.1); transition: transform 0.05s ease;">
-        <svg width="26" height="26" style="position: absolute; top: -2.5px; left: -2.5px; transform: rotate(-90deg);">
-            <circle r="12" cx="13" cy="13" fill="transparent" stroke="#ffaa00" stroke-width="2.5" stroke-dasharray="76" stroke-dashoffset="76" id="virtual-cursor-progress" style="transition: stroke-dashoffset 0.1s linear;"></circle>
-        </svg>
-    </div>
+        // App States
+        let isCameraRunning = false;
+        let isVideoMirrored = false;
+        let soundEnabled = true;
+        let activeJutsu = 'NONE';
+        let trainingTargetJutsu = 'SHADOW_CLONE';
+        let latestResults = null;
+        let lastKnownHandPos = { x: 0.5, y: 0.5 };
+        
+        let cloneData = null;
+        let cloneTriggerTime = 0;
+        let xp = 0;
+        let chakraLevel = 100;
+        let lastFrameTime = performance.now();
 
-    <!-- Application Script -->
-    <script src="js/app.js"></script>
+        // Particles System
+        let particles = [];
+        const MAX_PARTICLES = 150;
+
+        // Sound setup
+        let audioCtx = null;
+        let chidoriInterval = null;
+        let fireballInterval = null;
+        let rasenganOsc = null;
+        let rasenganGain = null;
+        let waterInterval = null;
+        let earthInterval = null;
+        let jutsuTriggerTime = 0;
+
+        // Element Themes Map
+        const THEMES = {
+            SHADOW_CLONE: { color: '#b500ff', glow: 'rgba(181, 0, 255, 0.4)' },
+            FIREBALL: { color: '#ff3333', glow: 'rgba(255, 51, 51, 0.4)' },
+            RASENGAN: { color: '#ffaa00', glow: 'rgba(255, 170, 0, 0.4)' },
+            CHIDORI: { color: '#00d2ff', glow: 'rgba(0, 210, 255, 0.4)' },
+            WATER_DRAGON: { color: '#0088ff', glow: 'rgba(0, 136, 255, 0.4)' },
+            EARTH_WALL: { color: '#c8963e', glow: 'rgba(200, 150, 62, 0.4)' }
+        };
+
+        class Particle {
+            constructor(x, y, type, color, size, vx, vy, maxLife) {
+                this.x = x;
+                this.y = y;
+                this.type = type; // 'fire', 'smoke', 'lightning_spark', 'aura'
+                this.color = color;
+                this.size = size;
+                this.vx = vx;
+                this.vy = vy;
+                this.life = maxLife;
+                this.maxLife = maxLife;
+            }
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.life--;
+                
+                if (this.type === 'fire') {
+                    this.size = Math.max(0.1, this.size - 0.35);
+                    this.vy -= 0.08; // float up
+                } else if (this.type === 'smoke') {
+                    this.size += 0.25;
+                    this.vx *= 0.96;
+                    this.vy *= 0.96;
+                } else if (this.type === 'lightning_spark') {
+                    this.size = Math.max(0.1, this.size - 0.25);
+                } else if (this.type === 'aura') {
+                    this.size = Math.max(0.1, this.size - 0.15);
+                } else if (this.type === 'water') {
+                    this.size = Math.max(0.1, this.size - 0.2);
+                    this.vy += 0.08; // gravity
+                } else if (this.type === 'earth') {
+                    this.vy += 0.12; // gravity pulling rocks down
+                    this.size = Math.max(0.1, this.size - 0.04);
+                }
+            }
+            draw(ctx) {
+                ctx.save();
+                ctx.globalAlpha = this.life / this.maxLife;
+                ctx.fillStyle = this.color;
+                
+                if (this.type === 'lightning_spark') {
+                    ctx.strokeStyle = this.color;
+                    ctx.lineWidth = this.size;
+                    ctx.beginPath();
+                    ctx.moveTo(this.x, this.y);
+                    ctx.lineTo(this.x + (Math.random() - 0.5) * 15, this.y + (Math.random() - 0.5) * 15);
+                    ctx.stroke();
+                } else {
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                ctx.restore();
+            }
+        }
+
+        // Initialize Audio Context on first interaction
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        // Programmatic Sounds
+        function playPoofSound() {
+            if (!soundEnabled) return;
+            initAudio();
+            const bufferSize = audioCtx.sampleRate * 0.35;
+            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = Math.random() * 2 - 1;
+            }
+            
+            const noise = audioCtx.createBufferSource();
+            noise.buffer = buffer;
+            
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = 'bandpass';
+            filter.frequency.value = 800;
+            filter.Q.value = 2.0;
+            
+            const gain = audioCtx.createGain();
+            gain.gain.setValueAtTime(0.35, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.35);
+            
+            noise.connect(filter);
+            filter.connect(gain);
+            gain.connect(audioCtx.destination);
+            noise.start();
+        }
+
+        function startChidoriSound() {
+            if (!soundEnabled || chidoriInterval) return;
+            initAudio();
+            chidoriInterval = setInterval(() => {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(1000 + Math.random() * 1800, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(80, audioCtx.currentTime + 0.07);
+                
+                gain.gain.setValueAtTime(0.06, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.07);
+                
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.07);
+            }, 60);
+        }
+
+        function stopChidoriSound() {
+            if (chidoriInterval) {
+                clearInterval(chidoriInterval);
+                chidoriInterval = null;
+            }
+        }
+
+        function startRasenganSound() {
+            if (!soundEnabled || rasenganOsc) return;
+            initAudio();
+            rasenganOsc = audioCtx.createOscillator();
+            rasenganGain = audioCtx.createGain();
+            rasenganOsc.type = 'sine';
+            rasenganOsc.frequency.setValueAtTime(95, audioCtx.currentTime);
+            
+            const lfo = audioCtx.createOscillator();
+            const lfoGain = audioCtx.createGain();
+            lfo.frequency.value = 9;
+            lfoGain.gain.value = 30;
+            
+            lfo.connect(lfoGain);
+            lfoGain.connect(rasenganOsc.frequency);
+            
+            rasenganGain.gain.setValueAtTime(0.35, audioCtx.currentTime);
+            rasenganOsc.connect(rasenganGain);
+            rasenganGain.connect(audioCtx.destination);
+            
+            lfo.start();
+            rasenganOsc.start();
+        }
+
+        function stopRasenganSound() {
+            if (rasenganOsc) {
+                try {
+                    rasenganOsc.stop();
+                } catch(e){}
+                rasenganOsc = null;
+                rasenganGain = null;
+            }
+        }
+
+        function startFireballSound() {
+            if (!soundEnabled || fireballInterval) return;
+            initAudio();
+            fireballInterval = setInterval(() => {
+                const bufferSize = audioCtx.sampleRate * 0.12;
+                const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    data[i] = Math.random() * 2 - 1;
+                }
+                
+                const noise = audioCtx.createBufferSource();
+                noise.buffer = buffer;
+                
+                const filter = audioCtx.createBiquadFilter();
+                filter.type = 'lowpass';
+                filter.frequency.setValueAtTime(280 + Math.random() * 140, audioCtx.currentTime);
+                
+                const gain = audioCtx.createGain();
+                gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.12);
+                
+                noise.connect(filter);
+                filter.connect(gain);
+                gain.connect(audioCtx.destination);
+                noise.start();
+                noise.stop(audioCtx.currentTime + 0.12);
+            }, 80);
+        }
+
+        function stopFireballSound() {
+            if (fireballInterval) {
+                clearInterval(fireballInterval);
+                fireballInterval = null;
+            }
+        }
+
+        function startWaterSound() {
+            if (!soundEnabled || waterInterval) return;
+            initAudio();
+            waterInterval = setInterval(() => {
+                const bufferSize = audioCtx.sampleRate * 0.15;
+                const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    data[i] = Math.random() * 2 - 1;
+                }
+                
+                const noise = audioCtx.createBufferSource();
+                noise.buffer = buffer;
+                
+                const filter = audioCtx.createBiquadFilter();
+                filter.type = 'bandpass';
+                const t = performance.now() * 0.002;
+                filter.frequency.setValueAtTime(350 + Math.sin(t) * 150 + Math.random() * 50, audioCtx.currentTime);
+                filter.Q.value = 3.0;
+                
+                const gain = audioCtx.createGain();
+                gain.gain.setValueAtTime(0.18, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
+                
+                noise.connect(filter);
+                filter.connect(gain);
+                gain.connect(audioCtx.destination);
+                noise.start();
+                noise.stop(audioCtx.currentTime + 0.15);
+            }, 60);
+        }
+
+        function stopWaterSound() {
+            if (waterInterval) {
+                clearInterval(waterInterval);
+                waterInterval = null;
+            }
+        }
+
+        function startEarthSound() {
+            if (!soundEnabled || earthInterval) return;
+            initAudio();
+            earthInterval = setInterval(() => {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(45 + Math.random() * 20, audioCtx.currentTime);
+                osc.frequency.linearRampToValueAtTime(30, audioCtx.currentTime + 0.22);
+                
+                const bufferSize = audioCtx.sampleRate * 0.22;
+                const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    data[i] = Math.random() * 2 - 1;
+                }
+                const noise = audioCtx.createBufferSource();
+                noise.buffer = buffer;
+                
+                const filter = audioCtx.createBiquadFilter();
+                filter.type = 'lowpass';
+                filter.frequency.setValueAtTime(100, audioCtx.currentTime);
+                
+                const noiseGain = audioCtx.createGain();
+                noiseGain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+                noiseGain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.22);
+                
+                gain.gain.setValueAtTime(0.35, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.22);
+                
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                
+                noise.connect(filter);
+                filter.connect(noiseGain);
+                noiseGain.connect(audioCtx.destination);
+                
+                osc.start();
+                noise.start();
+                osc.stop(audioCtx.currentTime + 0.22);
+                noise.stop(audioCtx.currentTime + 0.22);
+            }, 140);
+        }
+
+        function stopEarthSound() {
+            if (earthInterval) {
+                clearInterval(earthInterval);
+                earthInterval = null;
+            }
+        }
+
+        function emitWaterParticles(x, y) {
+            for (let i = 0; i < 4; i++) {
+                const angle = performance.now() * 0.01 + (i * Math.PI * 2 / 4);
+                const radius = 25 + Math.sin(performance.now() * 0.006) * 12;
+                const px = x + Math.cos(angle) * radius;
+                const py = y + Math.sin(angle) * radius;
+                const vx = (Math.random() - 0.5) * 4;
+                const vy = -3 - Math.random() * 4;
+                const size = 5 + Math.random() * 8;
+                const color = Math.random() > 0.4 ? '#00d2ff' : '#0066ff';
+                particles.push(new Particle(px, py, 'water', color, size, vx, vy, 25 + Math.random()*15));
+            }
+        }
+
+        function emitEarthParticles(x, y) {
+            if (Math.random() > 0.35) {
+                const px = Math.random() * canvasElement.width;
+                const py = canvasElement.height;
+                const vx = (Math.random() - 0.5) * 2;
+                const vy = -5 - Math.random() * 5;
+                const size = 6 + Math.random() * 12;
+                const color = Math.random() > 0.5 ? '#6e4720' : '#c8963e';
+                particles.push(new Particle(px, py, 'earth', color, size, vx, vy, 35 + Math.random()*15));
+            }
+        }
+
+        // Particle Generators
+        function emitFireParticles(x, y) {
+            for (let i = 0; i < 4; i++) {
+                const angle = (Math.random() - 0.5) * 0.45 - Math.PI/2;
+                const speed = 4 + Math.random() * 8;
+                const vx = Math.cos(angle) * speed;
+                const vy = Math.sin(angle) * speed;
+                const size = 15 + Math.random() * 20;
+                const color = Math.random() > 0.4 ? '#ff5500' : (Math.random() > 0.5 ? '#ffaa00' : '#ff3300');
+                particles.push(new Particle(x, y, 'fire', color, size, vx, vy, 40 + Math.random()*20));
+            }
+        }
+
+        function emitSmokeParticles(x, y, count = 25) {
+            for (let i = 0; i < count; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = 1.0 + Math.random() * 4.0;
+                const vx = Math.cos(angle) * speed;
+                const vy = Math.sin(angle) * speed;
+                const size = 10 + Math.random() * 15;
+                const color = Math.random() > 0.5 ? '#e2e6eb' : '#cccccc';
+                particles.push(new Particle(x, y, 'smoke', color, size, vx, vy, 30 + Math.random()*20));
+            }
+        }
+
+        function emitAuraParticles(x, y, color) {
+            if (Math.random() > 0.5) return;
+            const vx = (Math.random() - 0.5) * 1.5;
+            const vy = -1 - Math.random() * 1.5;
+            particles.push(new Particle(x, y, 'aura', color, 4 + Math.random() * 4, vx, vy, 20 + Math.random() * 10));
+        }
+
+        // Logger Helper
+        function logMessage(text, isGreen = false) {
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${isGreen ? 'active-log' : ''}`;
+            entry.innerText = `[${new Date().toLocaleTimeString()}] ${text}`;
+            consoleLogs.appendChild(entry);
+            consoleLogs.scrollTop = consoleLogs.scrollHeight;
+        }
+
+        // Check hand gestures
+        function isFingerExtended(hand, tipIdx, pipIdx) {
+            const dTip = getDist(hand[tipIdx], hand[0]);
+            const dPip = getDist(hand[pipIdx], hand[0]);
+            return dTip > dPip * 1.02;
+        }
+
+        function isFingerCurled(hand, tipIdx, pipIdx) {
+            const dTip = getDist(hand[tipIdx], hand[0]);
+            const dPip = getDist(hand[pipIdx], hand[0]);
+            return dTip < dPip * 0.95;
+        }
+
+        function getDist(p1, p2) {
+            return Math.hypot(p1.x - p2.x, p1.y - p2.y);
+        }
+
+        // Classify hand seals based on active choice
+        function checkGestureSeals(landmarks) {
+            if (!landmarks || landmarks.length === 0) return 'NONE';
+
+            // 1. SHADOW CLONE (Kage Bunshin): Cross Seal of 2 hands touching index tips
+            if (landmarks.length === 2 && trainingTargetJutsu === 'SHADOW_CLONE') {
+                const h1 = landmarks[0][8];
+                const h2 = landmarks[1][8];
+                const dist = Math.hypot(h1.x - h2.x, h1.y - h2.y);
+                if (dist < 0.08) {
+                    return 'SHADOW_CLONE';
+                }
+            }
+
+            // For single hand gestures, evaluate based on target jutsu
+            const hand = landmarks[0];
+            const palmSize = getDist(hand[0], hand[9]);
+            if (palmSize < 0.015) return 'NONE';
+
+            // Finger extended states
+            const idxExt  = isFingerExtended(hand, 8, 6);
+            const midExt  = isFingerExtended(hand, 12, 10);
+            const ringExt = isFingerExtended(hand, 16, 14);
+            const pkyExt  = isFingerExtended(hand, 20, 18);
+
+            const idxCrl  = isFingerCurled(hand, 8, 6);
+            const midCrl  = isFingerCurled(hand, 12, 10);
+            const ringCrl = isFingerCurled(hand, 16, 14);
+            const pkyCrl  = isFingerCurled(hand, 20, 18);
+
+            const thumbExt = getDist(hand[4], hand[0]) > getDist(hand[3], hand[0]) * 1.01;
+            const thumbCrl = getDist(hand[4], hand[0]) < getDist(hand[3], hand[0]) * 0.96;
+
+            // 2. GREAT FIREBALL (Fire Release): Flat hand (all 4 fingers extended)
+            if (trainingTargetJutsu === 'FIREBALL') {
+                if (idxExt && midExt && ringExt && pkyExt) {
+                    return 'FIREBALL';
+                }
+            }
+
+            // 3. RASENGAN (Wind Seal): Thumb & Pinky extended, index, middle, ring curled
+            if (trainingTargetJutsu === 'RASENGAN') {
+                if (thumbExt && pkyExt && idxCrl && midCrl && ringCrl) {
+                    return 'RASENGAN';
+                }
+            }
+
+            // 4. CHIDORI (Lightning Seal): Index and pinky extended, middle and ring curled, thumb curled
+            if (trainingTargetJutsu === 'CHIDORI') {
+                if (idxExt && pkyExt && midCrl && ringCrl && thumbCrl) {
+                    return 'CHIDORI';
+                }
+            }
+
+            // 5. WATER DRAGON (Water Seal): Index finger curled under thumb, middle, ring, pinky extended
+            if (trainingTargetJutsu === 'WATER_DRAGON') {
+                if (idxCrl && midExt && ringExt && pkyExt) {
+                    return 'WATER_DRAGON';
+                }
+            }
+
+            // 6. EARTH WALL (Earth Seal): Index and middle extended, others curled
+            if (trainingTargetJutsu === 'EARTH_WALL') {
+                if (idxExt && midExt && ringCrl && pkyCrl && thumbCrl) {
+                    return 'EARTH_WALL';
+                }
+            }
+
+            return 'NONE';
+        }
+
+        // Trigger Jutsu Activation
+        function invokeJutsu(name) {
+            activeJutsu = name;
+            jutsuTriggerTime = performance.now();
+            
+            // Set element custom properties
+            const theme = THEMES[name];
+            document.documentElement.style.setProperty('--active-chakra', theme.color);
+            document.documentElement.style.setProperty('--active-glow', theme.glow);
+            elementGlow.style.boxShadow = `inset 0 0 50px ${theme.color}`;
+
+            // Trigger Visual Flash
+            flashScreen.style.opacity = '1';
+            setTimeout(() => { flashScreen.style.opacity = '0.15'; }, 100);
+            setTimeout(() => { flashScreen.style.opacity = '0'; }, 300);
+
+            // Sound
+            playPoofSound();
+            if (name === 'CHIDORI') startChidoriSound();
+            else if (name === 'RASENGAN') startRasenganSound();
+            else if (name === 'FIREBALL') startFireballSound();
+            else if (name === 'WATER_DRAGON') startWaterSound();
+            else if (name === 'EARTH_WALL') startEarthSound();
+            
+            // Logs & Overlay
+            const displayTitle = name.replace('_', ' ');
+            logMessage(`💥 ${displayTitle.toUpperCase()} JUTSU ACTIVATED!`, true);
+            statusOverlay.innerText = displayTitle;
+            statusOverlay.classList.add('jutsu-active');
+
+            // Set clone cache if Kage Bunshin
+            if (name === 'SHADOW_CLONE') {
+                cloneTriggerTime = performance.now();
+                if (latestResults) {
+                    const tempCanvas = document.createElement('canvas');
+                    tempCanvas.width = canvasElement.width;
+                    tempCanvas.height = canvasElement.height;
+                    const tempCtx = tempCanvas.getContext('2d');
+                    if (isVideoMirrored) {
+                        tempCtx.translate(canvasElement.width, 0);
+                        tempCtx.scale(-1, 1);
+                    }
+                    tempCtx.drawImage(videoElement, 0, 0, tempCanvas.width, tempCanvas.height);
+                    cloneData = tempCanvas;
+                }
+                emitSmokeParticles(lastKnownHandPos.x * canvasElement.width, lastKnownHandPos.y * canvasElement.height, 35);
+            }
+        }
+
+        function releaseJutsu() {
+            if (activeJutsu === 'NONE') return;
+
+            logMessage(`${activeJutsu.replace('_', ' ')} released.`);
+            
+            stopChidoriSound();
+            stopRasenganSound();
+            stopFireballSound();
+            stopWaterSound();
+            stopEarthSound();
+
+            activeJutsu = 'NONE';
+            cloneData = null;
+            
+            elementGlow.style.boxShadow = 'inset 0 0 0px transparent';
+            statusOverlay.innerText = 'FORM THE TARGET SEAL';
+            statusOverlay.classList.remove('jutsu-active');
+        }
+
+        // Draw electrical lightning arcing paths
+        function drawLightningArc(ctx, x1, y1, x2, y2, color, thickness) {
+            ctx.save();
+            ctx.strokeStyle = color;
+            ctx.lineWidth = thickness;
+            ctx.shadowColor = color;
+            ctx.shadowBlur = 10;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            
+            ctx.beginPath();
+            ctx.moveTo(x1, y1);
+            
+            const dist = Math.hypot(x2 - x1, y2 - y1);
+            const steps = Math.floor(dist / 12);
+            let cx = x1;
+            let cy = y1;
+            
+            for (let i = 1; i < steps; i++) {
+                const t = i / steps;
+                const px = x1 + (x2 - x1) * t;
+                const py = y1 + (y2 - y1) * t;
+                
+                // offset normal vector
+                const normalX = -(y2 - y1) / dist;
+                const normalY = (x2 - x1) / dist;
+                const offset = (Math.random() - 0.5) * 14;
+                
+                cx = px + normalX * offset;
+                cy = py + normalY * offset;
+                ctx.lineTo(cx, cy);
+            }
+            
+            ctx.lineTo(x2, y2);
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        // Render looping graphics at 60 FPS
+        function drawLoop() {
+            if (!isCameraRunning) return;
+            
+            canvasCtx.save();
+            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+            
+            // Mirror flip logic
+            if (isVideoMirrored) {
+                canvasCtx.translate(canvasElement.width, 0);
+                canvasCtx.scale(-1, 1);
+            }
+            
+            // Draw raw camera feed
+            if (videoElement && videoElement.readyState >= 2) {
+                canvasCtx.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
+            }
+            
+            // Render active Jutsus effects
+            if (activeJutsu !== 'NONE') {
+                const handX = lastKnownHandPos.x * canvasElement.width;
+                const handY = lastKnownHandPos.y * canvasElement.height;
+
+                if (activeJutsu === 'FIREBALL') {
+                    emitFireParticles(handX, handY);
+                } else if (activeJutsu === 'WATER_DRAGON') {
+                    emitWaterParticles(handX, handY);
+                    
+                    // Draw a beautiful swirling water spiral around the hand
+                    const t = performance.now() * 0.015;
+                    canvasCtx.save();
+                    canvasCtx.strokeStyle = 'rgba(0, 210, 255, 0.75)';
+                    canvasCtx.lineWidth = 5;
+                    canvasCtx.shadowColor = '#0077ff';
+                    canvasCtx.shadowBlur = 15;
+                    canvasCtx.lineCap = 'round';
+                    
+                    canvasCtx.beginPath();
+                    let first = true;
+                    for (let angle = 0; angle < Math.PI * 6; angle += 0.2) {
+                        const radius = angle * 4 + Math.sin(t + angle) * 6;
+                        const px = handX + Math.cos(angle + t) * radius;
+                        const py = handY + Math.sin(angle + t) * radius;
+                        if (first) {
+                            canvasCtx.moveTo(px, py);
+                            first = false;
+                        } else {
+                            canvasCtx.lineTo(px, py);
+                        }
+                    }
+                    canvasCtx.stroke();
+                    canvasCtx.restore();
+                } else if (activeJutsu === 'EARTH_WALL') {
+                    emitEarthParticles(handX, handY);
+                    
+                    // Draw earth columns rising
+                    const elapsed = performance.now() - jutsuTriggerTime;
+                    const wallHeight = Math.min(canvasElement.height * 0.35, elapsed * 0.25);
+                    canvasCtx.save();
+                    canvasCtx.fillStyle = 'rgba(110, 71, 32, 0.85)';
+                    canvasCtx.strokeStyle = '#4d3116';
+                    canvasCtx.lineWidth = 3;
+                    
+                    const colWidth = canvasElement.width / 5;
+                    for (let col = 0; col < 5; col++) {
+                        const cx = col * colWidth;
+                        const cy = canvasElement.height - wallHeight * (0.8 + Math.sin(col * 2 + performance.now() * 0.002) * 0.15);
+                        canvasCtx.fillRect(cx + 4, cy, colWidth - 8, canvasElement.height - cy);
+                        canvasCtx.strokeRect(cx + 4, cy, colWidth - 8, canvasElement.height - cy);
+                        
+                        // draw texture lines
+                        canvasCtx.beginPath();
+                        canvasCtx.moveTo(cx + colWidth / 2, cy);
+                        canvasCtx.lineTo(cx + colWidth / 2 + (Math.sin(col) * 10), cy + 40);
+                        canvasCtx.stroke();
+                    }
+                    canvasCtx.restore();
+                } else if (activeJutsu === 'RASENGAN') {
+                    // Render spinning blue energy ball
+                    const radius = 55 + Math.sin(performance.now() * 0.01) * 6;
+                    
+                    canvasCtx.save();
+                    // Draw outer glowing halo
+                    const grad = canvasCtx.createRadialGradient(handX, handY, 5, handX, handY, radius);
+                    grad.addColorStop(0, 'rgba(255, 255, 255, 0.95)');
+                    grad.addColorStop(0.2, 'rgba(255, 180, 0, 0.85)');
+                    grad.addColorStop(0.7, 'rgba(255, 100, 0, 0.35)');
+                    grad.addColorStop(1, 'rgba(255, 50, 0, 0)');
+                    canvasCtx.fillStyle = grad;
+                    canvasCtx.beginPath();
+                    canvasCtx.arc(handX, handY, radius, 0, Math.PI*2);
+                    canvasCtx.fill();
+                    
+                    // Draw spinning concentric orbital rings
+                    const spinAngle = performance.now() * 0.005;
+                    canvasCtx.strokeStyle = '#ffffff';
+                    canvasCtx.lineWidth = 1.5;
+                    canvasCtx.globalAlpha = 0.55;
+                    
+                    for (let rIdx = 0; rIdx < 3; rIdx++) {
+                        canvasCtx.beginPath();
+                        const rOffset = rIdx * 1.5;
+                        canvasCtx.arc(handX, handY, radius * (0.45 + rIdx * 0.15), spinAngle * (1 + rIdx * 0.5), spinAngle * (1 + rIdx * 0.5) + Math.PI * 1.1);
+                        canvasCtx.stroke();
+                    }
+                    canvasCtx.restore();
+                    
+                    if (Math.random() > 0.6) {
+                        particles.push(new Particle(
+                            handX, handY, 'lightning_spark', '#ffaa00', 2, 
+                            (Math.random() - 0.5) * 6, (Math.random() - 0.5) * 6, 12
+                        ));
+                    }
+                } else if (activeJutsu === 'CHIDORI') {
+                    // Electrical discharges
+                    if (latestResults && latestResults.multiHandLandmarks && latestResults.multiHandLandmarks.length > 0) {
+                        const hand = latestResults.multiHandLandmarks[0];
+                        const wristX = hand[0].x * canvasElement.width;
+                        const wristY = hand[0].y * canvasElement.height;
+                        
+                        const tips = [4, 8, 12, 16, 20];
+                        tips.forEach(idx => {
+                            const tx = hand[idx].x * canvasElement.width;
+                            const ty = hand[idx].y * canvasElement.height;
+                            drawLightningArc(canvasCtx, wristX, wristY, tx, ty, '#e0f7ff', 3);
+                            drawLightningArc(canvasCtx, wristX, wristY, tx, ty, '#00d2ff', 1.5);
+                            
+                            // Emit electrical sparks
+                            if (Math.random() > 0.4) {
+                                particles.push(new Particle(tx, ty, 'lightning_spark', '#e0f7ff', 3, (Math.random() - 0.5)*5, (Math.random() - 0.5)*5, 10));
+                            }
+                        });
+                        
+                        // Arcing randomly to edges
+                        if (Math.random() > 0.7) {
+                            const edgeX = Math.random() > 0.5 ? 0 : canvasElement.width;
+                            const edgeY = Math.random() * canvasElement.height;
+                            drawLightningArc(canvasCtx, wristX, wristY, edgeX, edgeY, '#00d2ff', 2);
+                        }
+                    } else {
+                        // fallback arcing from center hand pos
+                        for (let arc = 0; arc < 4; arc++) {
+                            const ex = handX + (Math.random() - 0.5) * 150;
+                            const ey = handY + (Math.random() - 0.5) * 150;
+                            drawLightningArc(canvasCtx, handX, handY, ex, ey, '#00d2ff', 2);
+                        }
+                    }
+                }
+            }
+            
+            // Draw Clones for Kage Bunshin
+            if (activeJutsu === 'SHADOW_CLONE' && cloneData) {
+                canvasCtx.globalAlpha = 0.65;
+                // Draw 2 clones on both sides of the screen
+                canvasCtx.drawImage(cloneData, -canvasElement.width / 5, 80, canvasElement.width / 1.5, canvasElement.height / 1.5);
+                canvasCtx.drawImage(cloneData, canvasElement.width / 1.9, 80, canvasElement.width / 1.5, canvasElement.height / 1.5);
+                canvasCtx.globalAlpha = 1.0;
+            }
+
+            // Draw Skeletal overlays
+            if (latestResults && latestResults.multiHandLandmarks && latestResults.multiHandLandmarks.length > 0) {
+                const theme = THEMES[activeJutsu] || THEMES.SHADOW_CLONE;
+                
+                latestResults.multiHandLandmarks.forEach(hand => {
+                    // Draw joint lines
+                    canvasCtx.save();
+                    canvasCtx.strokeStyle = theme.color;
+                    canvasCtx.lineWidth = 5.0;
+                    canvasCtx.globalAlpha = 0.45;
+                    canvasCtx.lineCap = 'round';
+                    canvasCtx.lineJoin = 'round';
+                    
+                    drawSkeletonPath(canvasCtx, hand, [0, 1, 2, 3, 4]);
+                    drawSkeletonPath(canvasCtx, hand, [0, 5, 6, 7, 8]);
+                    drawSkeletonPath(canvasCtx, hand, [9, 10, 11, 12]);
+                    drawSkeletonPath(canvasCtx, hand, [5, 9]);
+                    drawSkeletonPath(canvasCtx, hand, [13, 14, 15, 16]);
+                    drawSkeletonPath(canvasCtx, hand, [9, 13]);
+                    drawSkeletonPath(canvasCtx, hand, [0, 17, 18, 19, 20]);
+                    drawSkeletonPath(canvasCtx, hand, [13, 17]);
+                    canvasCtx.restore();
+                    
+                    // Draw joint points
+                    canvasCtx.save();
+                    canvasCtx.fillStyle = '#ffffff';
+                    canvasCtx.globalAlpha = 0.9;
+                    for (let i = 0; i < 21; i++) {
+                        const pt = hand[i];
+                        const px = pt.x * canvasElement.width;
+                        const py = pt.y * canvasElement.height;
+                        
+                        canvasCtx.beginPath();
+                        canvasCtx.arc(px, py, 3.5, 0, Math.PI * 2);
+                        canvasCtx.fill();
+                        
+                        // emit fingertip aura sparkles
+                        const tips = [4, 8, 12, 16, 20];
+                        if (tips.includes(i)) {
+                            emitAuraParticles(px, py, theme.color);
+                        }
+                    }
+                    canvasCtx.restore();
+                });
+            }
+            
+            // Draw & Update particles
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.update();
+                if (p.life <= 0) {
+                    particles.splice(i, 1);
+                } else {
+                    p.draw(canvasCtx);
+                }
+            }
+            
+            canvasCtx.restore();
+            requestAnimationFrame(drawLoop);
+        }
+
+        function drawSkeletonPath(ctx, landmarks, indices) {
+            if (!landmarks || landmarks.length === 0) return;
+            const canvas = ctx.canvas;
+            ctx.beginPath();
+            let first = true;
+            for (let i = 0; i < indices.length; i++) {
+                const pt = landmarks[indices[i]];
+                if (!pt) continue;
+                const px = pt.x * canvas.width;
+                const py = pt.y * canvas.height;
+                if (first) {
+                    ctx.moveTo(px, py);
+                    first = false;
+                } else {
+                    ctx.lineTo(px, py);
+                }
+            }
+            ctx.stroke();
+        }
+
+        // Setup MediaPipe detection
+        function onResults(results) {
+            latestResults = results;
+            
+            const frameNow = performance.now();
+            const dt = (frameNow - lastFrameTime) / 1000;
+            lastFrameTime = frameNow;
+            
+            let handDetected = false;
+            
+            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                handDetected = true;
+                const hand = results.multiHandLandmarks[0];
+                lastKnownHandPos = { 
+                    x: (hand[9].x + hand[0].x) / 2, 
+                    y: (hand[9].y + hand[0].y) / 2 
+                };
+            }
+            
+            // Evaluate Jutsu Seals
+            const detectedSeal = checkGestureSeals(results.multiHandLandmarks);
+            
+            if (detectedSeal !== 'NONE') {
+                if (activeJutsu !== detectedSeal) {
+                    if (activeJutsu !== 'NONE') {
+                        releaseJutsu();
+                    }
+                    invokeJutsu(detectedSeal);
+                }
+                
+                // Drain chakra slowly while active
+                chakraLevel = Math.max(0, chakraLevel - 8 * dt);
+                
+                // Add XP slowly
+                xp = Math.min(100, xp + 2.5 * dt);
+                shinobiXP.innerText = `${Math.round(xp)} / 100`;
+                
+                if (xp >= 100) {
+                    xp = 0;
+                    logMessage("⭐ NINJA RANK PROMOTED TO CHUNIN!", true);
+                    document.getElementById('shinobi-rank').innerText = 'CHUNIN';
+                    document.getElementById('shinobi-rank').style.color = 'var(--color-lightning)';
+                }
+            } else {
+                if (activeJutsu !== 'NONE') {
+                    releaseJutsu();
+                }
+                
+                // Recharge chakra slowly
+                chakraLevel = Math.min(100, chakraLevel + 12 * dt);
+            }
+            
+            // Update UI meters
+            chakraFill.style.width = `${chakraLevel}%`;
+            chakraPct.innerText = `${Math.round(chakraLevel)}%`;
+        }
+
+        // Initialize camera
+        const hands = new Hands({
+            locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+        });
+        
+        hands.setOptions({
+            maxNumHands: 2,
+            modelComplexity: 1,
+            minDetectionConfidence: 0.65,
+            minTrackingConfidence: 0.65
+        });
+        
+        hands.onResults(onResults);
+
+        const camera = new Camera(videoElement, {
+            onFrame: async () => {
+                if (videoElement.videoWidth && videoElement.videoHeight) {
+                    if (canvasElement.width !== videoElement.videoWidth || canvasElement.height !== videoElement.videoHeight) {
+                        canvasElement.width = videoElement.videoWidth;
+                        canvasElement.height = videoElement.videoHeight;
+                    }
+                    try {
+                        await hands.send({ image: videoElement });
+                    } catch(err) {
+                        console.error("Hands send failure:", err);
+                    }
+                }
+            },
+            width: 640,
+            height: 480,
+            facingMode: 'user'
+        });
+
+        camera.start().then(() => {
+            isCameraRunning = true;
+            logMessage("Dojo sensors initialized. Webcam streaming active.", true);
+            
+            // Kick off 60fps render loop
+            requestAnimationFrame(drawLoop);
+        }).catch(err => {
+            console.error("Webcam startup failed:", err);
+            logMessage("Failed to initialize webcam feed. Please allow camera permissions and reload.", false);
+            alert("Could not access camera. Please allow webcam permissions and refresh!");
+        });
+
+        // Bind Controls
+        document.getElementById('btn-sound').addEventListener('click', (e) => {
+            soundEnabled = !soundEnabled;
+            const dot = document.getElementById('sound-dot');
+            const btn = e.currentTarget;
+            
+            if (soundEnabled) {
+                dot.classList.add('active');
+                btn.classList.add('active');
+                btn.innerHTML = `<span id="sound-dot" class="sound-dot active"></span> SOUND SYNTH (ON)`;
+                logMessage("Sound synthesizers enabled.");
+                initAudio();
+            } else {
+                dot.classList.remove('active');
+                btn.classList.remove('active');
+                btn.innerHTML = `<span id="sound-dot" class="sound-dot"></span> SOUND SYNTH (OFF)`;
+                logMessage("Sound synthesizers muted.");
+                stopChidoriSound();
+                stopRasenganSound();
+                stopFireballSound();
+                stopWaterSound();
+                stopEarthSound();
+            }
+        });
+
+        document.getElementById('btn-mirror').addEventListener('click', (e) => {
+            isVideoMirrored = !isVideoMirrored;
+            const btn = e.currentTarget;
+            if (isVideoMirrored) {
+                btn.classList.add('active');
+                logMessage("Mirror mode enabled.");
+            } else {
+                btn.classList.remove('active');
+                logMessage("Mirror mode disabled.");
+            }
+        });
+
+        // Bind Jutsu library list item selections
+        document.querySelectorAll('.jutsu-card').forEach(card => {
+            card.addEventListener('click', (e) => {
+                // Clear active styles
+                document.querySelectorAll('.jutsu-card').forEach(c => c.classList.remove('active'));
+                
+                const cardJutsu = e.currentTarget.getAttribute('data-jutsu');
+                trainingTargetJutsu = cardJutsu;
+                
+                // Add active style
+                e.currentTarget.classList.add('active');
+                
+                // Change custom CSS variable properties
+                const theme = THEMES[cardJutsu] || THEMES.SHADOW_CLONE;
+                document.documentElement.style.setProperty('--active-chakra', theme.color);
+                document.documentElement.style.setProperty('--active-glow', theme.glow);
+                
+                logMessage(`Target training Jutsu set to: ${cardJutsu.replace('_', ' ').toUpperCase()}`);
+                
+                // release active just in case
+                releaseJutsu();
+            });
+        });
+
+        // Initialize Audio context on first click
+        window.addEventListener('click', () => {
+            initAudio();
+        }, { once: true });
+    </script>
 </body>
 </html>
