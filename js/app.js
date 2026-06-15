@@ -2121,7 +2121,7 @@ function drawLoop() {
         } else if (activeJutsu === 'FIREBALL') {
             fireGlow.style.boxShadow = `inset 0 0 ${isSupercharged ? '120px' : '70px'} rgba(255, 30, 0, 0.45)`;
             emitFire(handX, handY, isSupercharged);
-            // Automatically launch fireball blasts periodically during casting (no blowing required)
+            // Automatically launch fireball blasts periodically during casting
             if (Math.random() > 0.45) {
                 triggerFireballBlast(isSupercharged);
             }
@@ -2300,7 +2300,6 @@ async function startDojo() {
                     canvasElement.width = videoElement.videoWidth;
                     canvasElement.height = videoElement.videoHeight;
                 }
-                
                 try {
                     if (handsDetector) {
                         await handsDetector.send({ image: videoElement });
@@ -2308,7 +2307,6 @@ async function startDojo() {
                 } catch (handsErr) {
                     console.error("Hands detection error in frame loop:", handsErr);
                 }
-                
                 try {
                     if (faceDetector) {
                         await faceDetector.send({ image: videoElement });
@@ -2369,7 +2367,6 @@ async function startDojo() {
                         } catch (handsErr) {
                             console.error("Fallback hands detection error:", handsErr);
                         }
-                        
                         try {
                             if (faceDetector) {
                                 await faceDetector.send({ image: videoElement });
